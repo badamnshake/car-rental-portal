@@ -1,0 +1,42 @@
+services:
+  php8site:
+    image: php8
+    container_name: php8site
+    volumes:
+      - ./src:/var/www/html
+    ports:
+      - "8080:80"
+      - "443:443"
+    depends_on:
+      - mariadb
+
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: carrental
+      MYSQL_USER: kartavya
+      MYSQL_PASSWORD: password
+    volumes:
+      - ./mariadb_data:/var/lib/mysql
+      - ./src/carrental.sql:/docker-entrypoint-initdb.d/db_dump.sql
+    ports:
+      - "3306:3306"
+  
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    restart: always
+    environment:
+      PMA_HOST: mariadb
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: password
+    ports:
+      - "8081:80"
+    depends_on:
+      - mariadb
+
+volumes:
+  mariadb_data:
