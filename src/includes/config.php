@@ -1,9 +1,12 @@
 <?php 
 // DB credentials.
-define('DB_HOST','mariadb');
-define('DB_USER','kartavya');
-define('DB_PASS','password');
-define('DB_NAME','carrental');
+define('DB_HOST','');
+define('DB_USER','');
+define('DB_PASS','');
+define('DB_NAME','');
+define('GOOGLE_CLIENT_ID', '');
+define('GOOGLE_CLIENT_SECRET', '');
+define('GOOGLE_REDIRECT_URI', '');
 // Establish database connection.
 try
 {
