@@ -2,7 +2,7 @@
 ALTER TABLE tblusers 
 ADD COLUMN auth_type ENUM('googleoauth', 'legacy') NOT NULL DEFAULT 'legacy',
 ADD COLUMN oauth_id VARCHAR(255) NULL,
-ADD COLUMN oauth_token VARCHAR(255) NULL,
+ADD COLUMN oauth_token TEXT NULL,
 ADD COLUMN token_expiry DATETIME NULL;
 
 
