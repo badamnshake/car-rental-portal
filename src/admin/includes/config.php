@@ -1,8 +1,8 @@
 <?php 
 // DB credentials.
-define('DB_HOST','127.0.0.1');
-define('DB_USER','root');
-define('DB_PASS','StrongDBPassword@');
+define('DB_HOST','mariadb');
+define('DB_USER','kartavya');
+define('DB_PASS','password');
 define('DB_NAME','carrental');
 // Establish database connection.
 try
