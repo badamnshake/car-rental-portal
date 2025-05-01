@@ -33,6 +33,15 @@ error_reporting(0);
 <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700,900" rel="stylesheet"> 
 </head>
 <body>
+<?php 
+$loginPath = 'includes/login.php';
+if (file_exists($loginPath)) {
+    include($loginPath);
+} else {
+    echo "<!-- login.php not found at $loginPath -->";
+}
+?>
+<?php include('includes/login.php'); ?>
 
 <!-- Start Switcher -->
 <?php include('includes/colorswitcher.php');?>
@@ -159,7 +168,6 @@ foreach($results as $result)
 </section>
 <!-- /Fun Facts--> 
 
-
 <!--Testimonial -->
 <section class="section-padding testimonial-section parallex-bg">
   <div class="container div_zindex">
@@ -202,8 +210,6 @@ foreach($results as $result)
   <div class="dark-overlay"></div>
 </section>
 <!-- /Testimonial--> 
-
-
 <!--Footer -->
 <?php include('includes/footer.php');?>
 <!-- /Footer--> 
@@ -211,10 +217,6 @@ foreach($results as $result)
 <!--Back to top-->
 <div id="back-top" class="back-top"> <a href="#top"><i class="fa fa-angle-up" aria-hidden="true"></i> </a> </div>
 <!--/Back to top--> 
-
-<!--Login-Form -->
-<?php include('includes/login.php');?>
-<!--/Login-Form --> 
 
 <!--Register-Form -->
 <?php include('includes/registration.php');?>
@@ -226,16 +228,24 @@ foreach($results as $result)
 <!--/Forgot-password-Form --> 
 
 <!-- Scripts --> 
-<script src="assets/js/jquery.min.js"></script>
-<script src="assets/js/bootstrap.min.js"></script> 
-<script src="assets/js/interface.js"></script> 
-<!--Switcher-->
+<!-- jQuery FIRST -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<!-- Bootstrap JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+<!-- Interface script (yours) -->
+<script src="assets/js/interface.js"></script>
+
+<!-- Switcher (if needed) -->
 <script src="assets/switcher/js/switcher.js"></script>
-<!--bootstrap-slider-JS--> 
 <script src="assets/js/bootstrap-slider.min.js"></script> 
-<!--Slider-JS--> 
 <script src="assets/js/slick.min.js"></script> 
 <script src="assets/js/owl.carousel.min.js"></script>
+
+
+
+
 
 </body>
 
