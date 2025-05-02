@@ -1,0 +1,31 @@
+# Dockerfile.python
+FROM python:3.11-slim
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    tesseract-ocr \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up Python virtual environment
+RUN python3 -m venv /venv
+ENV PATH="/venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+
+# Install required Python packages
+RUN pip install --upgrade pip && \
+    pip install \
+    fastapi \
+    uvicorn \
+    pytesseract \
+    passporteye \
+    opencv-python-headless \
+    numpy \
+    pillow
+
+# Set workdir and expose FastAPI app
+WORKDIR /app
+COPY ./python-scripts /app
+
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

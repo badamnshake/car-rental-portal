@@ -1,6 +1,8 @@
 services:
   php8site:
-    image: php8
+    build:
+      context: .
+      dockerfile: Dockerfile.php
     container_name: php8site
     volumes:
       - ./src:/var/www/html
@@ -9,6 +11,20 @@ services:
       - "443:443"
     depends_on:
       - mariadb
+
+  passport-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: passport-api
+    volumes:
+      - ./python-scripts:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+
 
   mariadb:
     image: mariadb:latest

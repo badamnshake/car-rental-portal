@@ -18,9 +18,46 @@ $success = '';
 $error = '';
 $isVerified = false;
 
-// Check if form submitted
+
+function callPassportScanner($imageData)
+{
+  $imageData = str_replace(array("\r", "\n"), '', $imageData);
+
+
+
+  $url = 'http://passport-api:8000/scan'; // Replace with your FastAPI endpoint
+  $payload = json_encode(['image_base64' => $imageData]);
+
+  $ch = curl_init($url);
+
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_POST, true);
+  curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+  curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'Content-Length: ' . strlen($payload)
+  ]);
+
+  $response = curl_exec($ch);
+
+  if (curl_errno($ch)) {
+    echo 'Request Error: ' . curl_error($ch);
+  } else {
+    $result = json_decode($response, true);
+    if ($result === null) {
+      echo "Failed to decode JSON:\n$response";
+    } else {
+      echo "<pre>" . print_r($result, true) . "</pre>";
+    }
+  }
+
+  curl_close($ch);
+}
+
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!empty($_FILES['id_image']['tmp_name'])) {
+    // Case 1: File Upload
     $fileTmpPath = $_FILES['id_image']['tmp_name'];
     $fileName = basename($_FILES['id_image']['name']);
     $targetPath = $uploadPath . $fileName;
@@ -30,6 +67,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (move_uploaded_file($fileTmpPath, $targetPath)) {
         $success = "Passport image uploaded successfully.";
         $isVerified = true;
+
+        // Read image as base64
+        $imageData = base64_encode(file_get_contents($targetPath));
+
+        // Call Python
+        callPassportScanner($imageData);
       } else {
         $error = "Error with the uploaded image.";
       }
@@ -38,9 +81,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
   } elseif (!empty($_POST['photoInfo'])) {
+    // Case 2: Webcam
     $photoInfo = $_POST['photoInfo'];
     $photoInfo = str_replace('data:image/png;base64,', '', $photoInfo);
     $photoInfo = str_replace(' ', '+', $photoInfo);
+    $imageData = $photoInfo;
+
+    // Save webcam image
     $denosie = base64_decode($photoInfo);
     $fileName = 'webcam_' . time() . '.png';
     $filePath = $uploadPath . $fileName;
@@ -48,6 +95,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (file_put_contents($filePath, $denosie)) {
       $success = "Webcam image uploaded successfully.";
       $isVerified = true;
+
+      // Call Python
+      callPassportScanner($imageData);
     } else {
       $error = "Failed to save webcam image.";
     }
@@ -55,6 +105,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $error = "No image data provided.";
   }
 }
+
+
+
+// Check if form submitted
 ?>
 
 <!DOCTYPE HTML>
