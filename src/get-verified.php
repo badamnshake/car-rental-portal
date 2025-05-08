@@ -19,17 +19,20 @@ $error = '';
 $isVerified = false;
 
 
+
+
 function callPassportScanner($imageData)
 {
+
+  /* ------------------------------ passport api ------------------------------ */
+
   $imageData = str_replace(array("\r", "\n"), '', $imageData);
 
 
-
-  $url = 'http://passport-api:8000/scan'; // Replace with your FastAPI endpoint
+  $url = 'http://passport-api:8000/scan';
   $payload = json_encode(['image_base64' => $imageData]);
 
   $ch = curl_init($url);
-
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
   curl_setopt($ch, CURLOPT_POST, true);
   curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
@@ -39,20 +42,55 @@ function callPassportScanner($imageData)
   ]);
 
   $response = curl_exec($ch);
+  curl_close($ch);
 
   if (curl_errno($ch)) {
     echo 'Request Error: ' . curl_error($ch);
-  } else {
-    $result = json_decode($response, true);
-    if ($result === null) {
-      echo "Failed to decode JSON:\n$response";
-    } else {
-      echo "<pre>" . print_r($result, true) . "</pre>";
-    }
+    return;
   }
 
-  curl_close($ch);
+  $result = json_decode($response, true);
+
+
+  // echo $result['success'];
+  // echo $result['valid_score'];
+  // echo http_build_query($result, '\n', 'CRLF');
+
+
+
+  /* ------------------------------ db connection ----------------------------- */
+  $conn = $GLOBALS['dbh'];
+  $useremail = $_SESSION['login'];
+
+  $stmt = $conn->prepare("SELECT id, dob, fullname FROM tblusers WHERE EmailId = :email");
+  $stmt->bindParam(':email', $useremail, PDO::PARAM_STR);
+  $stmt->execute();
+  $userData = $stmt->fetchAll(PDO::FETCH_OBJ);
+
+  $userId = $userData[0]->id;
+
+  // if ai was not successful
+  if ($result == null || $result['success'] == false) {
+
+    $stmt = $conn->prepare("INSERT INTO tbluserphotos (user_id, photo_base64) VALUES (:userId, :imageData) ON DUPLICATE KEY UPDATE photo_base64 = :imageDataUpdate");
+    $stmt->bindValue(':userId', $userId);
+    $stmt->bindValue(':imageData', $imageData);
+    $stmt->bindValue(':imageDataUpdate', $imageData);
+    $stmt->execute();
+
+    $conn->query("UPDATE tblusers SET is_verified = 0, verification_pending = 1 WHERE id = '$userId'");
+
+    echo "Passport scan failed or invalid. Verification pending.";
+    return;
+  }
+
+  /* ---------------------------- passport is valid --------------------------- */
+
+  $conn->query("UPDATE tblusers SET is_verified = 1, verification_pending = 0 WHERE EmailId = '$useremail'");
+  echo "Passport verified successfully.";
+
 }
+
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -64,18 +102,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $PhotoTypes = ['image/png', 'image/jpg', 'image/jpeg'];
 
     if (in_array($_FILES['id_image']['type'], $PhotoTypes)) {
-      if (move_uploaded_file($fileTmpPath, $targetPath)) {
-        $success = "Passport image uploaded successfully.";
-        $isVerified = true;
-
-        // Read image as base64
-        $imageData = base64_encode(file_get_contents($targetPath));
-
-        // Call Python
-        callPassportScanner($imageData);
-      } else {
-        $error = "Error with the uploaded image.";
-      }
+      $imageData = base64_encode(file_get_contents($fileTmpPath));
+      callPassportScanner($imageData);
     } else {
       $error = "Error file type. Please upload JPG or PNG.";
     }
@@ -85,22 +113,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $photoInfo = $_POST['photoInfo'];
     $photoInfo = str_replace('data:image/png;base64,', '', $photoInfo);
     $photoInfo = str_replace(' ', '+', $photoInfo);
-    $imageData = $photoInfo;
-
-    // Save webcam image
-    $denosie = base64_decode($photoInfo);
-    $fileName = 'webcam_' . time() . '.png';
-    $filePath = $uploadPath . $fileName;
-
-    if (file_put_contents($filePath, $denosie)) {
-      $success = "Webcam image uploaded successfully.";
-      $isVerified = true;
-
-      // Call Python
-      callPassportScanner($imageData);
-    } else {
-      $error = "Failed to save webcam image.";
-    }
+    // $imageData = $photoInfo;
+    // Call Python
+    callPassportScanner($photoInfo);
   } else {
     $error = "No image data provided.";
   }
@@ -195,39 +210,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </section>
 
 
-<?php 
-$useremail=$_SESSION['login'];
-$sql = "SELECT * from tblusers where EmailId=:useremail";
-$query = $dbh -> prepare($sql);
-$query -> bindParam(':useremail',$useremail, PDO::PARAM_STR);
-$query->execute();
-$results=$query->fetchAll(PDO::FETCH_OBJ);
-$cnt=1;
-if($query->rowCount() > 0)
-{
-foreach($results as $result)
-{ ?>
-<section class="user_profile inner_pages">
-  <div class="container">
-    <div class="user_profile_info gray-bg padding_4x4_40">
-      <div class="upload_user_logo"> <img src="assets/images/dealer-logo.jpg" alt="image">
-      </div>
+  <?php
+  $useremail = $_SESSION['login'];
+  $sql = "SELECT * from tblusers where EmailId=:useremail";
+  $query = $dbh->prepare($sql);
+  $query->bindParam(':useremail', $useremail, PDO::PARAM_STR);
+  $query->execute();
+  $results = $query->fetchAll(PDO::FETCH_OBJ);
+  $cnt = 1;
+  if ($query->rowCount() > 0) {
+    foreach ($results as $result) { ?>
+      <section class="user_profile inner_pages">
+        <div class="container">
+          <div class="user_profile_info gray-bg padding_4x4_40">
+            <div class="upload_user_logo"> <img src="assets/images/dealer-logo.jpg" alt="image">
+            </div>
 
-      <div class="dealer_info">
-        <h5><?php echo htmlentities($result->FullName);?></h5>
-        <p><?php echo htmlentities($result->Address);?><br>
-          <?php echo htmlentities($result->City);?>&nbsp;<?php echo htmlentities($result->Country); }}?></p>
+            <div class="dealer_info">
+              <h5><?php echo htmlentities($result->FullName); ?></h5>
+              <p><?php echo htmlentities($result->Address); ?><br>
+                <?php echo htmlentities($result->City); ?>&nbsp;<?php echo htmlentities($result->Country);
+    }
+  } ?></p>
+        </div>
       </div>
-    </div>
 
       <div class="row">
         <div class="col-md-3 col-sm-3">
           <?php include('includes/sidebar.php'); ?>
           <div class="col-md-6 col-sm-8">
             <div class="profile_wrap">
-                <p>Verification Status:
-                  <?php echo $isVerified ? '<span style="color:green;">Verified</span>' : '<span style="color:red;">Not Verified</span>'; ?>
-                </p>
+              <p>Verification Status:
+                <?php echo $isVerified ? '<span style="color:green;">Verified</span>' : '<span style="color:red;">Not Verified</span>'; ?>
+              </p>
             </div>
 
             <div class="row">
