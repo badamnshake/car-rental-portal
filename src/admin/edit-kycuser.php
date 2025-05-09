@@ -26,21 +26,25 @@ if (strlen($_SESSION['alogin']) == 0) {
 		$msg = "User updated successfully";
 	}
 
-	//Aprrove
+	// Approve
 	if (isset($_POST['approve'])) {
 		$id = $_GET['id'];
 
+		// Approve user
 		$sql = "UPDATE tblusers 
-        SET is_verified = '1', verification_pending = 0
-        WHERE id = :id";
-
-
+            SET is_verified = '1', verification_pending = 0
+            WHERE id = :id";
 		$query = $dbh->prepare($sql);
 		$query->bindParam(':id', $id, PDO::PARAM_INT);
-
 		$query->execute();
 
-		$msg = "User updated successfully";
+		// Delete related photo record
+		$deleteSql = "DELETE FROM tbluserphotos WHERE user_id = :id";
+		$deleteQuery = $dbh->prepare($deleteSql);
+		$deleteQuery->bindParam(':id', $id, PDO::PARAM_INT);
+		$deleteQuery->execute();
+
+		$msg = "User approved and document deleted successfully.";
 	}
 
 	//Decline
@@ -60,7 +64,22 @@ if (strlen($_SESSION['alogin']) == 0) {
 
 		$msg = "User updated successfully";
 	}
+
+	//Open Document
+	$imageData = '';
+	if (isset($_GET['id'])) {
+		$user_id = $_GET['id'];
+		$sql = "SELECT photo_base64 FROM tbluserphotos WHERE user_id = :user_id";
+		$query = $dbh->prepare($sql);
+		$query->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+		$query->execute();
+		$result = $query->fetch(PDO::FETCH_ASSOC);
+		if ($result) {
+			$imageData = $result['photo_base64'];
+		}
+	}
 ?>
+	?>
 
 	<!doctype html>
 	<html lang="en" class="no-js">
@@ -189,19 +208,26 @@ if (strlen($_SESSION['alogin']) == 0) {
 												<?php }
 												} ?>
 
-
+												<!-- View Verification Button -->
 												<div class="form-group">
+													<div class="col-sm-8 col-sm-offset-4 mb-3">
+														<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#documentModal">
+															View Verification Document
+														</button>
+													</div>
+												</div>
 
+												<!-- Approve / Update / Decline Buttons -->
+												<div class="form-group">
 													<div class="col-sm-8 col-sm-offset-4">
 														<button class="btn btn-success" name="approve" type="submit">Approve</button>
 														<button class="btn btn-primary" name="update" type="submit">Update</button>
 														<button class="btn btn-danger" name="decline" type="submit">Decline</button>
-
 													</div>
 												</div>
 
-											</form>
 
+											</form>
 										</div>
 									</div>
 								</div>
@@ -214,6 +240,29 @@ if (strlen($_SESSION['alogin']) == 0) {
 					</div>
 
 
+				</div>
+			</div>
+		</div>
+
+		<!-- Modal -->
+		<div class="modal fade" id="documentModal" tabindex="-1" role="dialog" aria-labelledby="documentModalLabel" aria-hidden="true">
+			<div class="modal-dialog modal-lg" role="document">
+				<div class="modal-content">
+					<div class="modal-header">
+						<!--<h5 class="modal-title" id="documentModalLabel">Verification Document</h5>-->
+						<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+							<span aria-hidden="true">&times;</span>
+						</button>
+					</div>
+					<div class="modal-body text-center">
+						<?php if (!empty($imageData)): ?>
+							<img src="data:image/jpeg;base64,<?php echo $imageData; ?>"
+								alt="Verification Document"
+								style="max-width: 100%; height: auto; border: 1px solid #ccc;">
+						<?php else: ?>
+							<p>No image found for this user.</p>
+						<?php endif; ?>
+					</div>
 				</div>
 			</div>
 		</div>
