@@ -81,13 +81,21 @@ function callPassportScanner($imageData)
     $conn->query("UPDATE tblusers SET is_verified = 0, verification_pending = 1 WHERE id = '$userId'");
 
     echo "Passport scan failed or invalid. Verification pending.";
-    return;
+    $_SESSION['verification_pending'] = 1;
+
+  } else {
+    /* ---------------------------- passport is valid --------------------------- */
+    $conn->query("UPDATE tblusers SET is_verified = 1, verification_pending = 0 WHERE EmailId = '$useremail'");
+
+    $_SESSION['is_verified'] = 1;
+    $_SESSION['verification_pending'] = 0;
+
+    header('Location: ' . $_SERVER['REQUEST_URI']);
   }
 
-  /* ---------------------------- passport is valid --------------------------- */
+  header('Location: ' . $_SERVER['REQUEST_URI']);
 
-  $conn->query("UPDATE tblusers SET is_verified = 1, verification_pending = 0 WHERE EmailId = '$useremail'");
-  echo "Passport verified successfully.";
+
 
 }
 
@@ -204,7 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <li>Get Verified</li>
       </ul>
     </div>
-    </div>
+    </>
     <!-- Dark Overlay-->
     <div class="dark-overlay"></div>
   </section>
@@ -227,9 +235,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <div class="dealer_info">
-              <h5><?php echo htmlentities($result->FullName); ?></h5>
-              <p><?php echo htmlentities($result->Address); ?><br>
-                <?php echo htmlentities($result->City); ?>&nbsp;<?php echo htmlentities($result->Country);
+              <h5><?php echo htmlentities($result->FullName ?? ''); ?></h5>
+              <p><?php echo htmlentities($result->Address ?? ''); ?><br>
+                <?php echo htmlentities($result->City ?? ''); ?>&nbsp;<?php echo htmlentities($result->Country ?? '');
     }
   } ?></p>
         </div>
@@ -241,47 +249,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <div class="col-md-6 col-sm-8">
             <div class="profile_wrap">
               <p>Verification Status:
-                <?php echo $isVerified ? '<span style="color:green;">Verified</span>' : '<span style="color:red;">Not Verified</span>'; ?>
+                <?php echo $_SESSION['is_verified'] ? '<span style="color:green;">You are already Verified, Hooray!</span>' : '<span style="color:red;">Not Verified</span>'; ?>
               </p>
             </div>
 
-            <div class="row">
-              <div class="col-md-8 offset-md-2">
-                <h4>Verify your account by uploading a passport or taking a webcam photo</h4>
 
-                <?php if ($success): ?>
-                  <div class="alert alert-success"><?php echo $success; ?></div>
-                <?php elseif ($error): ?>
-                  <div class="alert alert-danger"><?php echo $error; ?></div>
-                <?php endif; ?>
 
-                <form method="POST" enctype="multipart/form-data" id="uploadForm">
-                  <!-- File Upload -->
-                  <div class="form-group">
-                    <label for="id_image">Upload Passport</label>
-                    <input type="file" name="id_image" id="id_image" class="form-control">
-                  </div>
-
-                  <p class="text-center">OR</p>
-
-                  <!-- Webcam -->
-                  <div class="form-group text-center">
-                    <video id="video" width="320" height="240" autoplay></video>
-                    <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
-                    <input type="hidden" name="photoInfo" id="photoInfo">
-                    <br>
-                    <button type="button" class="btn btn-info mt-2" onclick="startCamera()">Start Camera</button>
-                    <button type="button" class="btn btn-warning mt-2" onclick="takeSnapshot()">Take Photo</button>
-                  </div>
-
-                  <button type="submit" class="btn btn-success btn-block">Submit Verification</button>
-                </form>
+            <?php if (isset($_SESSION['verification_pending']) && $_SESSION['verification_pending']): ?>
+              <div style="color:blue;">
+                We are currently verfying your details please keep your eye on for updates
               </div>
+
+
+            <?php elseif (!$_SESSION['is_verified']): ?>
+              <div>
+                <div class="row">
+                  <div class="col-md-8 offset-md-2">
+                    <h4>Verify your account by uploading a passport or taking a webcam photo</h4>
+
+                    <?php if ($success): ?>
+                      <div class="alert alert-success"><?php echo $success; ?></div>
+                    <?php elseif ($error): ?>
+                      <div class="alert alert-danger"><?php echo $error; ?></div>
+                    <?php endif; ?>
+
+                    <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                      <!-- File Upload -->
+                      <div class="form-group">
+                        <label for="id_image">Upload Passport</label>
+                        <input type="file" name="id_image" id="id_image" class="form-control">
+                      </div>
+
+                      <p class="text-center">OR</p>
+
+                      <!-- Webcam -->
+                      <div class="form-group text-center">
+                        <video id="video" width="320" height="240" autoplay></video>
+                        <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+                        <input type="hidden" name="photoInfo" id="photoInfo">
+                        <br>
+                        <button type="button" class="btn btn-info mt-2" onclick="startCamera()">Start Camera</button>
+                        <button type="button" class="btn btn-warning mt-2" onclick="takeSnapshot()">Take Photo</button>
+                      </div>
+
+                      <button type="submit" class="btn btn-success btn-block">Submit Verification</button>
+                    </form>
+                  </div>
+                </div>
+              <?php endif; ?>
+
+
             </div>
           </div>
         </div>
       </div>
-    </div>
   </section>
 
   <script>

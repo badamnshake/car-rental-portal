@@ -894,8 +894,16 @@ table thead th, table thead td {
   margin-top: 1px;
   padding: 5px 10px;
 }
+
+.user_login_verified {
+  border: 2px solid rgb(72, 255, 0);
+}
+
+.user_login_unverified {
+  border: 1px solid rgba(255, 0, 0, 0.276);
+}
+
 .user_login {
-  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 3px;
   float: left;
   margin: 18px 10px 17px 0;

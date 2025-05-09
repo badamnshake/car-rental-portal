@@ -35,8 +35,13 @@ if (!isset($_SESSION['pending_oauth']) && isset($_GET['code'])) {
     $query->bindParam(':email', $email, PDO::PARAM_STR);
     $query->execute();
     $result = $query->fetch(PDO::FETCH_ASSOC);
+    print(implode($result));
 
     if ($result && $result['auth_type'] == 'legacy') {
+
+        $_SESSION['is_verified'] = $result['is_verified'];
+        $_SESSION['verification_pending'] = $result['verification_pending'];
+
         $_SESSION['pending_oauth'] = [
             'email' => $email,
             'name' => $name,
@@ -50,6 +55,10 @@ if (!isset($_SESSION['pending_oauth']) && isset($_GET['code'])) {
             });
         </script>";
     } elseif ($result) {
+
+
+        $_SESSION['is_verified'] = $result['is_verified'];
+        $_SESSION['verification_pending'] = $result['verification_pending'];
         // Update token
         $update = "UPDATE tblusers SET oauth_id=:oauth_id, oauth_token=:token WHERE EmailId=:email";
         $stmt = $dbh->prepare($update);
@@ -66,6 +75,9 @@ if (!isset($_SESSION['pending_oauth']) && isset($_GET['code'])) {
     } else {
 
         // Insert new user
+        //
+        $_SESSION['is_verified'] = false;
+        $_SESSION['verification_pending'] = false;
 
 
 

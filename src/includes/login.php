@@ -16,7 +16,7 @@ $google_login_url = $client->createAuthUrl();
 if (isset($_POST['login'])) {
   $email = $_POST['email'];
   $password = md5($_POST['password']);
-  $sql = "SELECT EmailId, Password, FullName FROM tblusers WHERE EmailId=:email AND Password=:password";
+  $sql = "SELECT EmailId, Password, FullName, is_verified, verification_pending FROM tblusers WHERE EmailId=:email AND Password=:password";
   $query = $dbh->prepare($sql);
   $query->bindParam(':email', $email, PDO::PARAM_STR);
   $query->bindParam(':password', $password, PDO::PARAM_STR);
@@ -25,6 +25,8 @@ if (isset($_POST['login'])) {
   if ($query->rowCount() > 0) {
     $_SESSION['login'] = $_POST['email'];
     $_SESSION['fname'] = $results->FullName;
+    $_SESSION['is_verified'] = $results->is_verified;
+    $_SESSION['verification_pending'] = $results->verification_pending;
     echo "<script type='text/javascript'> document.location = 'index.php'; </script>";
   } else {
     echo "<script>alert('Invalid Details');</script>";
