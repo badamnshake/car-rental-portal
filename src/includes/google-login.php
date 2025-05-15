@@ -3,7 +3,11 @@ session_start();
 require_once 'config.php';
 require_once '../vendor/autoload.php';
 
-$client = new Google_Client();
+
+use Google\Client;
+use Google\Service\Oauth2;
+
+$client = new Client();
 $client->setClientId(GOOGLE_CLIENT_ID);
 $client->setClientSecret(GOOGLE_CLIENT_SECRET);
 $client->setRedirectUri(GOOGLE_REDIRECT_URI);
@@ -21,7 +25,7 @@ if (!isset($_SESSION['pending_oauth']) && isset($_GET['code'])) {
         exit();
     }
 
-    $oauth = new Google_Service_Oauth2($client);
+    $oauth = new Oauth2($client);
     $userInfo = $oauth->userinfo->get();
 
     $email = $userInfo->email;
@@ -35,7 +39,7 @@ if (!isset($_SESSION['pending_oauth']) && isset($_GET['code'])) {
     $query->bindParam(':email', $email, PDO::PARAM_STR);
     $query->execute();
     $result = $query->fetch(PDO::FETCH_ASSOC);
-    print(implode($result));
+    #print(implode($result));
 
     if ($result && $result['auth_type'] == 'legacy') {
 

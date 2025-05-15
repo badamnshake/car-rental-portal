@@ -1,7 +1,11 @@
 <?php 
+
 session_start();
-include('includes/config.php');
+include 'includes/config.php';
 error_reporting(0);
+
+#error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
+#ini_set('display_errors', 1);
 
 ?>
 
@@ -74,7 +78,7 @@ if (file_exists($loginPath)) {
   <div class="container">
     <div class="section-header text-center">
       <h2>Find the Best <span>CarForYou</span></h2>
-      <p>There are many variations of passeners, but every one can be injected with humour. If you use our services, you get the best of that. And if you contribute to this culture, we give you a discount!</p>
+      <p>There are many variations of passengers, but every one can be injected with humour. If you use our services, you get the best of that. And if you contribute to this culture, we give you a discount!</p>
     </div>
     <div class="row"> 
       

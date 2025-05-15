@@ -1,6 +1,7 @@
 <?php
 session_start();
-include('includes/config.php');
+include 'includes/config.php';
+require_once 'includes/encryption.php';
 
 if (strlen($_SESSION['login']) == 0) {
   header('location:index.php');
@@ -21,14 +22,15 @@ $isVerified = false;
 
 
 
-function callPassportScanner($imageData)
+function callPassportScanner($imageData, $isBase64 = false)
 {
 
   /* ------------------------------ passport api ------------------------------ */
 
-  $imageData = str_replace(array("\r", "\n"), '', $imageData);
-
-
+  if ($isBase64) {
+    $imageData = str_replace(array("\r", "\n"), '', $imageData);
+  }
+  
   $url = 'http://passport-api:8000/scan';
   $payload = json_encode(['image_base64' => $imageData]);
 
@@ -72,10 +74,30 @@ function callPassportScanner($imageData)
   // if ai was not successful
   if ($result == null || $result['success'] == false) {
 
-    $stmt = $conn->prepare("INSERT INTO tbluserphotos (user_id, photo_base64) VALUES (:userId, :imageData) ON DUPLICATE KEY UPDATE photo_base64 = :imageDataUpdate");
+    #$stmt = $conn->prepare("INSERT INTO tbluserphotos (user_id, photo_base64) VALUES (:userId, :imageData) ON DUPLICATE KEY UPDATE photo_base64 = :imageDataUpdate");
+    #$stmt->bindValue(':userId', $userId);
+    #$stmt->bindValue(':imageData', $imageData);
+    #$stmt->bindValue(':imageDataUpdate', $imageData);
+    #$stmt->execute();
+    if ($isBase64) {
+      $imageData = base64_decode($imageData);
+    }
+
+    $aesKey = generateAESKey();
+    $iv = generateIV();
+    $encryptedImage = encryptImage($imageData, $aesKey, $iv);
+    $encryptedKey = encryptAESKeyWithRSA($aesKey);
+
+    $stmt = $conn->prepare(
+      "INSERT INTO tbluserphotos (user_id, photo_base64, aes_key, iv)
+        VALUES (:userId, :image, :key, :iv)
+        ON DUPLICATE KEY UPDATE photo_base64 = :image, aes_key = :key, iv = :iv
+        ");
+    
     $stmt->bindValue(':userId', $userId);
-    $stmt->bindValue(':imageData', $imageData);
-    $stmt->bindValue(':imageDataUpdate', $imageData);
+    $stmt->bindValue(':image', base64_encode($encryptedImage));
+    $stmt->bindValue(':key', $encryptedKey);
+    $stmt->bindValue(':iv', base64_encode($iv));
     $stmt->execute();
 
     $conn->query("UPDATE tblusers SET is_verified = 0, verification_pending = 1 WHERE id = '$userId'");
@@ -110,8 +132,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $PhotoTypes = ['image/png', 'image/jpg', 'image/jpeg'];
 
     if (in_array($_FILES['id_image']['type'], $PhotoTypes)) {
-      $imageData = base64_encode(file_get_contents($fileTmpPath));
-      callPassportScanner($imageData);
+      #$imageData = base64_encode(file_get_contents($fileTmpPath));
+      $imageData = file_get_contents($_FILES['id_image']['tmp_name']);
+      callPassportScanner($imageData, false);
     } else {
       $error = "Error file type. Please upload JPG or PNG.";
     }
@@ -123,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $photoInfo = str_replace(' ', '+', $photoInfo);
     // $imageData = $photoInfo;
     // Call Python
-    callPassportScanner($photoInfo);
+    callPassportScanner($photoInfo, true);
   } else {
     $error = "No image data provided.";
   }
