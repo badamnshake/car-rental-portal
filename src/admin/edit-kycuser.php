@@ -188,7 +188,7 @@ if (strlen($_SESSION['alogin']) == 0) {
 
 															<label class="col-sm-4 control-label">Date of Birth</label>
 															<div class="col-sm-8">
-																<input type="text" class="form-control" value="<?php echo htmlentities($result->dob); ?>" name="dob" id="dob" required>
+																<input type="text" class="form-control" value="<?php echo htmlentities($result->dob); ?>" name="dob" id="dob">
 															</div>
 
 															<!--
