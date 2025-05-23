@@ -9,18 +9,15 @@ header('location:index.php');
 else{
 if(isset($_POST['updateprofile']))
   {
-$name=$_POST['fullname'];
+// Removed fullname and dob from the update - they're now locked
 $mobileno=$_POST['mobilenumber'];
-$dob=$_POST['dob'];
 $adress=$_POST['address'];
 $city=$_POST['city'];
 $country=$_POST['country'];
 $email=$_SESSION['login'];
-$sql="update tblusers set FullName=:name,ContactNo=:mobileno,dob=:dob,Address=:adress,City=:city,Country=:country where EmailId=:email";
+$sql="update tblusers set ContactNo=:mobileno,Address=:adress,City=:city,Country=:country where EmailId=:email";
 $query = $dbh->prepare($sql);
-$query->bindParam(':name',$name,PDO::PARAM_STR);
 $query->bindParam(':mobileno',$mobileno,PDO::PARAM_STR);
-$query->bindParam(':dob',$dob,PDO::PARAM_STR);
 $query->bindParam(':adress',$adress,PDO::PARAM_STR);
 $query->bindParam(':city',$city,PDO::PARAM_STR);
 $query->bindParam(':country',$country,PDO::PARAM_STR);
@@ -80,6 +77,35 @@ $msg="Profile Updated Successfully";
     -webkit-box-shadow: 0 1px 1px 0 rgba(0,0,0,.1);
     box-shadow: 0 1px 1px 0 rgba(0,0,0,.1);
 }
+
+.locked-field {
+    background-color: #f8f9fa !important;
+    color: #6c757d;
+    cursor: not-allowed;
+    border: 1px solid #e9ecef;
+}
+
+.field-note {
+    font-size: 12px;
+    color: #6c757d;
+    font-style: italic;
+    margin-top: 5px;
+}
+
+.verification-warning {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 5px;
+    padding: 12px;
+    margin: 15px 0;
+    color: #856404;
+    font-size: 14px;
+}
+
+.verification-warning .fa {
+    color: #856404;
+    margin-right: 8px;
+}
     </style>
 </head>
 <body>
@@ -108,7 +134,6 @@ $msg="Profile Updated Successfully";
   <div class="dark-overlay"></div>
 </section>
 <!-- /Page Header--> 
-
 
 <?php 
 $useremail=$_SESSION['login'];
@@ -141,6 +166,14 @@ foreach($results as $result)
       <div class="col-md-6 col-sm-8">
         <div class="profile_wrap">
           <h5 class="uppercase underline">General Settings</h5>
+          
+          <!-- Verification Notice -->
+          <div class="verification-warning">
+            <i class="fa fa-info-circle"></i>
+            <strong>Important:</strong> Your Full Name and Date of Birth are locked to ensure passport verification integrity. 
+            These fields must match your passport exactly for successful verification.
+          </div>
+          
           <?php  
          if($msg){?><div class="succWrap"><strong>SUCCESS</strong>:<?php echo htmlentities($msg); ?> </div><?php }?>
           <form  method="post">
@@ -154,10 +187,16 @@ foreach($results as $result)
              <?php echo htmlentities($result->UpdationDate);?>
             </div>
             <?php } ?>
+            
+            <!-- LOCKED: Full Name Field -->
             <div class="form-group">
               <label class="control-label">Full Name</label>
-              <input class="form-control white_bg" name="fullname" value="<?php echo htmlentities($result->FullName);?>" id="fullname" type="text"  required>
+              <input class="form-control locked-field" value="<?php echo htmlentities($result->FullName);?>" type="text" readonly>
+              <div class="field-note">
+                <i class="fa fa-lock"></i> This field is locked for passport verification purposes. Contact support if changes are needed.
+              </div>
             </div>
+            
             <div class="form-group">
               <label class="control-label">Email Address</label>
               <input class="form-control white_bg" value="<?php echo htmlentities($result->EmailId);?>" name="emailid" id="email" type="email" required readonly>
@@ -166,17 +205,23 @@ foreach($results as $result)
               <label class="control-label">Phone Number</label>
               <input class="form-control white_bg" name="mobilenumber" value="<?php echo htmlentities($result->ContactNo);?>" id="phone-number" type="text" required>
             </div>
+            
+            <!-- LOCKED: Date of Birth Field -->
             <div class="form-group">
               <label class="control-label">Date of Birth&nbsp;(dd/mm/yyyy)</label>
-              <input class="form-control white_bg" value="<?php echo htmlentities($result->dob);?>" name="dob" placeholder="dd/mm/yyyy" id="birth-date" type="text" >
+              <input class="form-control locked-field" value="<?php echo htmlentities($result->dob);?>" type="text" readonly>
+              <div class="field-note">
+                <i class="fa fa-lock"></i> This field is locked for passport verification purposes. Contact support if changes are needed.
+              </div>
             </div>
+            
             <div class="form-group">
               <label class="control-label">Your Address</label>
               <textarea class="form-control white_bg" name="address" rows="4" ><?php echo htmlentities($result->Address);?></textarea>
             </div>
             <div class="form-group">
               <label class="control-label">Country</label>
-              <input class="form-control white_bg"  id="country" name="country" value="<?php echo htmlentities($result->City);?>" type="text">
+              <input class="form-control white_bg"  id="country" name="country" value="<?php echo htmlentities($result->Country);?>" type="text">
             </div>
             <div class="form-group">
               <label class="control-label">City</label>
@@ -195,7 +240,7 @@ foreach($results as $result)
 </section>
 <!--/Profile-setting--> 
 
-<<!--Footer -->
+<!--Footer -->
 <?php include('includes/footer.php');?>
 <!-- /Footer--> 
 

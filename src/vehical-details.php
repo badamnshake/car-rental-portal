@@ -2,55 +2,73 @@
 session_start();
 include('includes/config.php');
 error_reporting(0);
+
+// Check if user is verified before processing booking
 if(isset($_POST['submit']))
 {
-$fromdate=$_POST['fromdate'];
-$todate=$_POST['todate']; 
-$message=$_POST['message'];
-$useremail=$_SESSION['login'];
-$status=0;
-$vhid=$_GET['vhid'];
-$bookingno=mt_rand(100000000, 999999999);
-$ret="SELECT * FROM tblbooking where (:fromdate BETWEEN date(FromDate) and date(ToDate) || :todate BETWEEN date(FromDate) and date(ToDate) || date(FromDate) BETWEEN :fromdate and :todate) and VehicleId=:vhid";
-$query1 = $dbh -> prepare($ret);
-$query1->bindParam(':vhid',$vhid, PDO::PARAM_STR);
-$query1->bindParam(':fromdate',$fromdate,PDO::PARAM_STR);
-$query1->bindParam(':todate',$todate,PDO::PARAM_STR);
-$query1->execute();
-$results1=$query1->fetchAll(PDO::FETCH_OBJ);
+    // First check if user is verified
+    $useremail = $_SESSION['login'];
+    $verificationCheck = "SELECT is_verified, verification_pending FROM tblusers WHERE EmailId = :useremail";
+    $verifyQuery = $dbh->prepare($verificationCheck);
+    $verifyQuery->bindParam(':useremail', $useremail, PDO::PARAM_STR);
+    $verifyQuery->execute();
+    $userStatus = $verifyQuery->fetch(PDO::FETCH_OBJ);
+    
+    if (!$userStatus->is_verified) {
+        if ($userStatus->verification_pending) {
+            echo "<script>alert('Your passport verification is still pending. Please wait for approval before booking.');</script>";
+        } else {
+            echo "<script>alert('You must verify your passport before booking a car. Please complete verification first.');</script>";
+        }
+        echo "<script type='text/javascript'> document.location = 'get-verified.php'; </script>";
+        exit();
+    }
+    
+    // If verified, proceed with normal booking process
+    $fromdate=$_POST['fromdate'];
+    $todate=$_POST['todate']; 
+    $message=$_POST['message'];
+    $status=0;
+    $vhid=$_GET['vhid'];
+    $bookingno=mt_rand(100000000, 999999999);
+    
+    $ret="SELECT * FROM tblbooking where (:fromdate BETWEEN date(FromDate) and date(ToDate) || :todate BETWEEN date(FromDate) and date(ToDate) || date(FromDate) BETWEEN :fromdate and :todate) and VehicleId=:vhid";
+    $query1 = $dbh -> prepare($ret);
+    $query1->bindParam(':vhid',$vhid, PDO::PARAM_STR);
+    $query1->bindParam(':fromdate',$fromdate,PDO::PARAM_STR);
+    $query1->bindParam(':todate',$todate,PDO::PARAM_STR);
+    $query1->execute();
+    $results1=$query1->fetchAll(PDO::FETCH_OBJ);
 
-if($query1->rowCount()==0)
-{
-
-$sql="INSERT INTO  tblbooking(BookingNumber,userEmail,VehicleId,FromDate,ToDate,message,Status) VALUES(:bookingno,:useremail,:vhid,:fromdate,:todate,:message,:status)";
-$query = $dbh->prepare($sql);
-$query->bindParam(':bookingno',$bookingno,PDO::PARAM_STR);
-$query->bindParam(':useremail',$useremail,PDO::PARAM_STR);
-$query->bindParam(':vhid',$vhid,PDO::PARAM_STR);
-$query->bindParam(':fromdate',$fromdate,PDO::PARAM_STR);
-$query->bindParam(':todate',$todate,PDO::PARAM_STR);
-$query->bindParam(':message',$message,PDO::PARAM_STR);
-$query->bindParam(':status',$status,PDO::PARAM_STR);
-$query->execute();
-$lastInsertId = $dbh->lastInsertId();
-if($lastInsertId)
-{
-echo "<script>alert('Booking successfull.');</script>";
-echo "<script type='text/javascript'> document.location = 'my-booking.php'; </script>";
+    if($query1->rowCount()==0)
+    {
+        $sql="INSERT INTO  tblbooking(BookingNumber,userEmail,VehicleId,FromDate,ToDate,message,Status) VALUES(:bookingno,:useremail,:vhid,:fromdate,:todate,:message,:status)";
+        $query = $dbh->prepare($sql);
+        $query->bindParam(':bookingno',$bookingno,PDO::PARAM_STR);
+        $query->bindParam(':useremail',$useremail,PDO::PARAM_STR);
+        $query->bindParam(':vhid',$vhid,PDO::PARAM_STR);
+        $query->bindParam(':fromdate',$fromdate,PDO::PARAM_STR);
+        $query->bindParam(':todate',$todate,PDO::PARAM_STR);
+        $query->bindParam(':message',$message,PDO::PARAM_STR);
+        $query->bindParam(':status',$status,PDO::PARAM_STR);
+        $query->execute();
+        $lastInsertId = $dbh->lastInsertId();
+        if($lastInsertId)
+        {
+            echo "<script>alert('Booking successful.');</script>";
+            echo "<script type='text/javascript'> document.location = 'my-booking.php'; </script>";
+        }
+        else 
+        {
+            echo "<script>alert('Something went wrong. Please try again');</script>";
+            echo "<script type='text/javascript'> document.location = 'car-listing.php'; </script>";
+        } 
+    } else {
+        echo "<script>alert('Car already booked for these days');</script>"; 
+        echo "<script type='text/javascript'> document.location = 'car-listing.php'; </script>";
+    }
 }
-else 
-{
-echo "<script>alert('Something went wrong. Please try again');</script>";
- echo "<script type='text/javascript'> document.location = 'car-listing.php'; </script>";
-} }  else{
- echo "<script>alert('Car already booked for these days');</script>"; 
- echo "<script type='text/javascript'> document.location = 'car-listing.php'; </script>";
-}
-
-}
-
 ?>
-
 
 <!DOCTYPE HTML>
 <html lang="en">
@@ -72,19 +90,68 @@ echo "<script>alert('Something went wrong. Please try again');</script>";
 <link href="assets/css/font-awesome.min.css" rel="stylesheet">
 
 <!-- SWITCHER -->
-		<link rel="stylesheet" id="switcher-css" type="text/css" href="assets/switcher/css/switcher.css" media="all" />
-		<link rel="alternate stylesheet" type="text/css" href="assets/switcher/css/red.css" title="red" media="all" data-default-color="true" />
-		<link rel="alternate stylesheet" type="text/css" href="assets/switcher/css/orange.css" title="orange" media="all" />
-		<link rel="alternate stylesheet" type="text/css" href="assets/switcher/css/blue.css" title="blue" media="all" />
-		<link rel="alternate stylesheet" type="text/css" href="assets/switcher/css/pink.css" title="pink" media="all" />
-		<link rel="alternate stylesheet" type="text/css" href="assets/switcher/css/green.css" title="green" media="all" />
-		<link rel="alternate stylesheet" type="text/css" href="assets/switcher/css/purple.css" title="purple" media="all" />
+<link rel="stylesheet" id="switcher-css" type="text/css" href="assets/switcher/css/switcher.css" media="all" />
+<link rel="alternate stylesheet" type="text/css" href="assets/switcher/css/red.css" title="red" media="all" data-default-color="true" />
+<link rel="alternate stylesheet" type="text/css" href="assets/switcher/css/orange.css" title="orange" media="all" />
+<link rel="alternate stylesheet" type="text/css" href="assets/switcher/css/blue.css" title="blue" media="all" />
+<link rel="alternate stylesheet" type="text/css" href="assets/switcher/css/pink.css" title="pink" media="all" />
+<link rel="alternate stylesheet" type="text/css" href="assets/switcher/css/green.css" title="green" media="all" />
+<link rel="alternate stylesheet" type="text/css" href="assets/switcher/css/purple.css" title="purple" media="all" />
 <link rel="apple-touch-icon-precomposed" sizes="144x144" href="assets/images/favicon-icon/apple-touch-icon-144-precomposed.png">
 <link rel="apple-touch-icon-precomposed" sizes="114x114" href="assets/images/favicon-icon/apple-touch-icon-114-precomposed.html">
 <link rel="apple-touch-icon-precomposed" sizes="72x72" href="assets/images/favicon-icon/apple-touch-icon-72-precomposed.png">
 <link rel="apple-touch-icon-precomposed" href="assets/images/favicon-icon/apple-touch-icon-57-precomposed.png">
 <link rel="shortcut icon" href="assets/images/favicon-icon/favicon.png">
 <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700,900" rel="stylesheet">
+<style>
+.verification-warning {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 5px;
+    padding: 15px;
+    margin: 15px 0;
+    color: #856404;
+}
+
+.verification-error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 5px;
+    padding: 15px;
+    margin: 15px 0;
+    color: #721c24;
+}
+
+.verification-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 5px;
+    padding: 15px;
+    margin: 15px 0;
+    color: #155724;
+}
+
+.disabled-form {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.verify-btn {
+    background: #007bff;
+    color: white;
+    padding: 10px 20px;
+    text-decoration: none;
+    border-radius: 5px;
+    display: inline-block;
+    margin: 10px 0;
+}
+
+.verify-btn:hover {
+    background: #0056b3;
+    color: white;
+    text-decoration: none;
+}
+</style>
 </head>
 <body>
 
@@ -97,7 +164,6 @@ echo "<script>alert('Something went wrong. Please try again');</script>";
 <!-- /Header --> 
 
 <!--Listing-Image-Slider-->
-
 <?php 
 $vhid=intval($_GET['vhid']);
 $sql = "SELECT tblvehicles.*,tblbrands.BrandName,tblbrands.id as bid  from tblvehicles join tblbrands on tblbrands.id=tblvehicles.VehiclesBrand where tblvehicles.id=:vhid";
@@ -128,7 +194,6 @@ $_SESSION['brndid']=$result->bid;
 </section>
 <!--/Listing-Image-Slider-->
 
-
 <!--Listing-detail-->
 <section class="listing-detail">
   <div class="container">
@@ -139,7 +204,6 @@ $_SESSION['brndid']=$result->bid;
       <div class="col-md-3">
         <div class="price_info">
           <p>$<?php echo htmlentities($result->PricePerDay);?> </p>Per Day
-         
         </div>
       </div>
     </div>
@@ -147,7 +211,6 @@ $_SESSION['brndid']=$result->bid;
       <div class="col-md-9">
         <div class="main_features">
           <ul>
-          
             <li> <i class="fa fa-calendar" aria-hidden="true"></i>
               <h5><?php echo htmlentities($result->ModelYear);?></h5>
               <p>Reg.Year</p>
@@ -156,7 +219,6 @@ $_SESSION['brndid']=$result->bid;
               <h5><?php echo htmlentities($result->FuelType);?></h5>
               <p>Fuel Type</p>
             </li>
-       
             <li> <i class="fa fa-user-plus" aria-hidden="true"></i>
               <h5><?php echo htmlentities($result->SeatingCapacity);?></h5>
               <p>Seats</p>
@@ -168,7 +230,6 @@ $_SESSION['brndid']=$result->bid;
             <!-- Nav tabs -->
             <ul class="nav nav-tabs gray-bg" role="tablist">
               <li role="presentation" class="active"><a href="#vehicle-overview " aria-controls="vehicle-overview" role="tab" data-toggle="tab">Vehicle Overview </a></li>
-          
               <li role="presentation"><a href="#accessories" aria-controls="accessories" role="tab" data-toggle="tab">Accessories</a></li>
             </ul>
             
@@ -176,10 +237,8 @@ $_SESSION['brndid']=$result->bid;
             <div class="tab-content"> 
               <!-- vehicle-overview -->
               <div role="tabpanel" class="tab-pane active" id="vehicle-overview">
-                
                 <p><?php echo htmlentities($result->VehiclesOverview);?></p>
               </div>
-              
               
               <!-- Accessories -->
               <div role="tabpanel" class="tab-pane" id="accessories"> 
@@ -193,180 +252,223 @@ $_SESSION['brndid']=$result->bid;
                   <tbody>
                     <tr>
                       <td>Air Conditioner</td>
-<?php if($result->AirConditioner==1)
-{
-?>
-                      <td><i class="fa fa-check" aria-hidden="true"></i></td>
-<?php } else { ?> 
-   <td><i class="fa fa-close" aria-hidden="true"></i></td>
-   <?php } ?> </tr>
-
-<tr>
-<td>AntiLock Braking System</td>
-<?php if($result->AntiLockBrakingSystem==1)
-{
-?>
-<td><i class="fa fa-check" aria-hidden="true"></i></td>
-<?php } else {?>
-<td><i class="fa fa-close" aria-hidden="true"></i></td>
-<?php } ?>
+                      <?php if($result->AirConditioner==1) { ?>
+                        <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                      <?php } else { ?> 
+                        <td><i class="fa fa-close" aria-hidden="true"></i></td>
+                      <?php } ?>
                     </tr>
 
-<tr>
-<td>Power Steering</td>
-<?php if($result->PowerSteering==1)
-{
-?>
-<td><i class="fa fa-check" aria-hidden="true"></i></td>
-<?php } else { ?>
-<td><i class="fa fa-close" aria-hidden="true"></i></td>
-<?php } ?>
-</tr>
-                   
-
-<tr>
-
-<td>Power Windows</td>
-
-<?php if($result->PowerWindows==1)
-{
-?>
-<td><i class="fa fa-check" aria-hidden="true"></i></td>
-<?php } else { ?>
-<td><i class="fa fa-close" aria-hidden="true"></i></td>
-<?php } ?>
-</tr>
-                   
- <tr>
-<td>CD Player</td>
-<?php if($result->CDPlayer==1)
-{
-?>
-<td><i class="fa fa-check" aria-hidden="true"></i></td>
-<?php } else { ?>
-<td><i class="fa fa-close" aria-hidden="true"></i></td>
-<?php } ?>
-</tr>
-
-<tr>
-<td>Leather Seats</td>
-<?php if($result->LeatherSeats==1)
-{
-?>
-<td><i class="fa fa-check" aria-hidden="true"></i></td>
-<?php } else { ?>
-<td><i class="fa fa-close" aria-hidden="true"></i></td>
-<?php } ?>
-</tr>
-
-<tr>
-<td>Central Locking</td>
-<?php if($result->CentralLocking==1)
-{
-?>
-<td><i class="fa fa-check" aria-hidden="true"></i></td>
-<?php } else { ?>
-<td><i class="fa fa-close" aria-hidden="true"></i></td>
-<?php } ?>
-</tr>
-
-<tr>
-<td>Power Door Locks</td>
-<?php if($result->PowerDoorLocks==1)
-{
-?>
-<td><i class="fa fa-check" aria-hidden="true"></i></td>
-<?php } else { ?>
-<td><i class="fa fa-close" aria-hidden="true"></i></td>
-<?php } ?>
-                    </tr>
                     <tr>
-<td>Brake Assist</td>
-<?php if($result->BrakeAssist==1)
-{
-?>
-<td><i class="fa fa-check" aria-hidden="true"></i></td>
-<?php  } else { ?>
-<td><i class="fa fa-close" aria-hidden="true"></i></td>
-<?php } ?>
-</tr>
+                      <td>AntiLock Braking System</td>
+                      <?php if($result->AntiLockBrakingSystem==1) { ?>
+                        <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                      <?php } else { ?>
+                        <td><i class="fa fa-close" aria-hidden="true"></i></td>
+                      <?php } ?>
+                    </tr>
 
-<tr>
-<td>Driver Airbag</td>
-<?php if($result->DriverAirbag==1)
-{
-?>
-<td><i class="fa fa-check" aria-hidden="true"></i></td>
-<?php } else { ?>
-<td><i class="fa fa-close" aria-hidden="true"></i></td>
-<?php } ?>
- </tr>
- 
- <tr>
- <td>Passenger Airbag</td>
- <?php if($result->PassengerAirbag==1)
-{
-?>
-<td><i class="fa fa-check" aria-hidden="true"></i></td>
-<?php } else {?>
-<td><i class="fa fa-close" aria-hidden="true"></i></td>
-<?php } ?>
-</tr>
+                    <tr>
+                      <td>Power Steering</td>
+                      <?php if($result->PowerSteering==1) { ?>
+                        <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                      <?php } else { ?>
+                        <td><i class="fa fa-close" aria-hidden="true"></i></td>
+                      <?php } ?>
+                    </tr>
 
-<tr>
-<td>Crash Sensor</td>
-<?php if($result->CrashSensor==1)
-{
-?>
-<td><i class="fa fa-check" aria-hidden="true"></i></td>
-<?php } else { ?>
-<td><i class="fa fa-close" aria-hidden="true"></i></td>
-<?php } ?>
-</tr>
+                    <tr>
+                      <td>Power Windows</td>
+                      <?php if($result->PowerWindows==1) { ?>
+                        <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                      <?php } else { ?>
+                        <td><i class="fa fa-close" aria-hidden="true"></i></td>
+                      <?php } ?>
+                    </tr>
+                    
+                    <tr>
+                      <td>CD Player</td>
+                      <?php if($result->CDPlayer==1) { ?>
+                        <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                      <?php } else { ?>
+                        <td><i class="fa fa-close" aria-hidden="true"></i></td>
+                      <?php } ?>
+                    </tr>
 
+                    <tr>
+                      <td>Leather Seats</td>
+                      <?php if($result->LeatherSeats==1) { ?>
+                        <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                      <?php } else { ?>
+                        <td><i class="fa fa-close" aria-hidden="true"></i></td>
+                      <?php } ?>
+                    </tr>
+
+                    <tr>
+                      <td>Central Locking</td>
+                      <?php if($result->CentralLocking==1) { ?>
+                        <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                      <?php } else { ?>
+                        <td><i class="fa fa-close" aria-hidden="true"></i></td>
+                      <?php } ?>
+                    </tr>
+
+                    <tr>
+                      <td>Power Door Locks</td>
+                      <?php if($result->PowerDoorLocks==1) { ?>
+                        <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                      <?php } else { ?>
+                        <td><i class="fa fa-close" aria-hidden="true"></i></td>
+                      <?php } ?>
+                    </tr>
+
+                    <tr>
+                      <td>Brake Assist</td>
+                      <?php if($result->BrakeAssist==1) { ?>
+                        <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                      <?php  } else { ?>
+                        <td><i class="fa fa-close" aria-hidden="true"></i></td>
+                      <?php } ?>
+                    </tr>
+
+                    <tr>
+                      <td>Driver Airbag</td>
+                      <?php if($result->DriverAirbag==1) { ?>
+                        <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                      <?php } else { ?>
+                        <td><i class="fa fa-close" aria-hidden="true"></i></td>
+                      <?php } ?>
+                    </tr>
+                    
+                    <tr>
+                      <td>Passenger Airbag</td>
+                      <?php if($result->PassengerAirbag==1) { ?>
+                        <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                      <?php } else { ?>
+                        <td><i class="fa fa-close" aria-hidden="true"></i></td>
+                      <?php } ?>
+                    </tr>
+
+                    <tr>
+                      <td>Crash Sensor</td>
+                      <?php if($result->CrashSensor==1) { ?>
+                        <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                      <?php } else { ?>
+                        <td><i class="fa fa-close" aria-hidden="true"></i></td>
+                      <?php } ?>
+                    </tr>
                   </tbody>
                 </table>
               </div>
             </div>
           </div>
-          
         </div>
-<?php }} ?>
-   
+        <?php }} ?>
       </div>
       
       <!--Side-Bar-->
       <aside class="col-md-3">
-      
         <div class="share_vehicle">
           <p>Share: <a href="#"><i class="fa fa-facebook-square" aria-hidden="true"></i></a> <a href="#"><i class="fa fa-twitter-square" aria-hidden="true"></i></a> <a href="#"><i class="fa fa-linkedin-square" aria-hidden="true"></i></a> <a href="#"><i class="fa fa-google-plus-square" aria-hidden="true"></i></a> </p>
         </div>
+        
         <div class="sidebar_widget">
           <div class="widget_heading">
             <h5><i class="fa fa-envelope" aria-hidden="true"></i>Book Now</h5>
           </div>
-          <form method="post">
-            <div class="form-group">
-              <label>From Date:</label>
-              <input type="date" class="form-control" name="fromdate" placeholder="From Date" required>
-            </div>
-            <div class="form-group">
-              <label>To Date:</label>
-              <input type="date" class="form-control" name="todate" placeholder="To Date" required>
-            </div>
-            <div class="form-group">
-              <textarea rows="4" class="form-control" name="message" placeholder="Message" required></textarea>
-            </div>
-          <?php if($_SESSION['login'])
-              {?>
-              <div class="form-group">
-                <input type="submit" class="btn"  name="submit" value="Book Now">
+          
+          <?php if($_SESSION['login']) {
+            // Check user verification status
+            $useremail = $_SESSION['login'];
+            $verificationCheck = "SELECT is_verified, verification_pending FROM tblusers WHERE EmailId = :useremail";
+            $verifyQuery = $dbh->prepare($verificationCheck);
+            $verifyQuery->bindParam(':useremail', $useremail, PDO::PARAM_STR);
+            $verifyQuery->execute();
+            $userStatus = $verifyQuery->fetch(PDO::FETCH_OBJ);
+            
+            if ($userStatus->is_verified) { ?>
+              <!-- Verified users can book -->
+              <div class="verification-success">
+                <i class="fa fa-check-circle"></i> <strong>Verified Account</strong>
+                <p>Your passport is verified. You can book this vehicle.</p>
               </div>
-              <?php } else { ?>
-<a href="#loginform" class="btn btn-xs uppercase" data-toggle="modal" data-dismiss="modal">Login For Book</a>
-
-              <?php } ?>
-          </form>
+              
+              <form method="post">
+                <div class="form-group">
+                  <label>From Date:</label>
+                  <input type="date" class="form-control" name="fromdate" placeholder="From Date" required>
+                </div>
+                <div class="form-group">
+                  <label>To Date:</label>
+                  <input type="date" class="form-control" name="todate" placeholder="To Date" required>
+                </div>
+                <div class="form-group">
+                  <textarea rows="4" class="form-control" name="message" placeholder="Message" required></textarea>
+                </div>
+                <div class="form-group">
+                  <input type="submit" class="btn" name="submit" value="Book Now">
+                </div>
+              </form>
+              
+            <?php } elseif ($userStatus->verification_pending) { ?>
+              <!-- Pending verification -->
+              <div class="verification-warning">
+                <i class="fa fa-clock-o"></i> <strong>Verification Pending</strong>
+                <p>Your passport verification is being reviewed. You cannot book until verification is complete.</p>
+                <a href="get-verified.php" class="verify-btn">Check Status</a>
+              </div>
+              
+              <form method="post" class="disabled-form">
+                <div class="form-group">
+                  <label>From Date:</label>
+                  <input type="date" class="form-control" name="fromdate" placeholder="From Date" disabled>
+                </div>
+                <div class="form-group">
+                  <label>To Date:</label>
+                  <input type="date" class="form-control" name="todate" placeholder="To Date" disabled>
+                </div>
+                <div class="form-group">
+                  <textarea rows="4" class="form-control" name="message" placeholder="Message" disabled></textarea>
+                </div>
+                <div class="form-group">
+                  <input type="submit" class="btn" name="submit" value="Verification Required" disabled>
+                </div>
+              </form>
+              
+            <?php } else { ?>
+              <!-- Not verified -->
+              <div class="verification-error">
+                <i class="fa fa-exclamation-triangle"></i> <strong>Verification Required</strong>
+                <p>You must verify your passport before booking a vehicle.</p>
+                <a href="get-verified.php" class="verify-btn">Verify Passport</a>
+              </div>
+              
+              <form method="post" class="disabled-form">
+                <div class="form-group">
+                  <label>From Date:</label>
+                  <input type="date" class="form-control" name="fromdate" placeholder="From Date" disabled>
+                </div>
+                <div class="form-group">
+                  <label>To Date:</label>
+                  <input type="date" class="form-control" name="todate" placeholder="To Date" disabled>
+                </div>
+                <div class="form-group">
+                  <textarea rows="4" class="form-control" name="message" placeholder="Message" disabled></textarea>
+                </div>
+                <div class="form-group">
+                  <input type="submit" class="btn" name="submit" value="Verify Passport First" disabled>
+                </div>
+              </form>
+              
+            <?php }
+          } else { ?>
+            <!-- Not logged in -->
+            <div class="verification-warning">
+              <i class="fa fa-sign-in"></i> <strong>Login Required</strong>
+              <p>Please login to book this vehicle.</p>
+            </div>
+            <a href="#loginform" class="btn btn-xs uppercase" data-toggle="modal" data-dismiss="modal">Login For Book</a>
+          <?php } ?>
         </div>
       </aside>
       <!--/Side-Bar--> 
@@ -379,41 +481,37 @@ $_SESSION['brndid']=$result->bid;
     <div class="similar_cars">
       <h3>Similar Cars</h3>
       <div class="row">
-<?php 
-$bid=$_SESSION['brndid'];
-$sql="SELECT tblvehicles.VehiclesTitle,tblbrands.BrandName,tblvehicles.PricePerDay,tblvehicles.FuelType,tblvehicles.ModelYear,tblvehicles.id,tblvehicles.SeatingCapacity,tblvehicles.VehiclesOverview,tblvehicles.Vimage1 from tblvehicles join tblbrands on tblbrands.id=tblvehicles.VehiclesBrand where tblvehicles.VehiclesBrand=:bid";
-$query = $dbh -> prepare($sql);
-$query->bindParam(':bid',$bid, PDO::PARAM_STR);
-$query->execute();
-$results=$query->fetchAll(PDO::FETCH_OBJ);
-$cnt=1;
-if($query->rowCount() > 0)
-{
-foreach($results as $result)
-{ ?>      
-        <div class="col-md-3 grid_listing">
-          <div class="product-listing-m gray-bg">
-            <div class="product-listing-img"> <a href="vehical-details.php?vhid=<?php echo htmlentities($result->id);?>"><img src="admin/img/vehicleimages/<?php echo htmlentities($result->Vimage1);?>" class="img-responsive" alt="image" /> </a>
-            </div>
-            <div class="product-listing-content">
-              <h5><a href="vehical-details.php?vhid=<?php echo htmlentities($result->id);?>"><?php echo htmlentities($result->BrandName);?> , <?php echo htmlentities($result->VehiclesTitle);?></a></h5>
-              <p class="list-price">$<?php echo htmlentities($result->PricePerDay);?></p>
-          
-              <ul class="features_list">
-                
-             <li><i class="fa fa-user" aria-hidden="true"></i><?php echo htmlentities($result->SeatingCapacity);?> seats</li>
-                <li><i class="fa fa-calendar" aria-hidden="true"></i><?php echo htmlentities($result->ModelYear);?> model</li>
-                <li><i class="fa fa-car" aria-hidden="true"></i><?php echo htmlentities($result->FuelType);?></li>
-              </ul>
+        <?php 
+        $bid=$_SESSION['brndid'];
+        $sql="SELECT tblvehicles.VehiclesTitle,tblbrands.BrandName,tblvehicles.PricePerDay,tblvehicles.FuelType,tblvehicles.ModelYear,tblvehicles.id,tblvehicles.SeatingCapacity,tblvehicles.VehiclesOverview,tblvehicles.Vimage1 from tblvehicles join tblbrands on tblbrands.id=tblvehicles.VehiclesBrand where tblvehicles.VehiclesBrand=:bid";
+        $query = $dbh -> prepare($sql);
+        $query->bindParam(':bid',$bid, PDO::PARAM_STR);
+        $query->execute();
+        $results=$query->fetchAll(PDO::FETCH_OBJ);
+        $cnt=1;
+        if($query->rowCount() > 0)
+        {
+        foreach($results as $result)
+        { ?>      
+          <div class="col-md-3 grid_listing">
+            <div class="product-listing-m gray-bg">
+              <div class="product-listing-img"> <a href="vehical-details.php?vhid=<?php echo htmlentities($result->id);?>"><img src="admin/img/vehicleimages/<?php echo htmlentities($result->Vimage1);?>" class="img-responsive" alt="image" /> </a>
+              </div>
+              <div class="product-listing-content">
+                <h5><a href="vehical-details.php?vhid=<?php echo htmlentities($result->id);?>"><?php echo htmlentities($result->BrandName);?> , <?php echo htmlentities($result->VehiclesTitle);?></a></h5>
+                <p class="list-price">$<?php echo htmlentities($result->PricePerDay);?></p>
+                <ul class="features_list">
+                  <li><i class="fa fa-user" aria-hidden="true"></i><?php echo htmlentities($result->SeatingCapacity);?> seats</li>
+                  <li><i class="fa fa-calendar" aria-hidden="true"></i><?php echo htmlentities($result->ModelYear);?> model</li>
+                  <li><i class="fa fa-car" aria-hidden="true"></i><?php echo htmlentities($result->FuelType);?></li>
+                </ul>
+              </div>
             </div>
           </div>
-        </div>
- <?php }} ?>       
-
+        <?php }} ?>       
       </div>
     </div>
     <!--/Similar-Cars--> 
-    
   </div>
 </section>
 <!--/Listing-detail--> 
@@ -432,7 +530,6 @@ foreach($results as $result)
 
 <!--Register-Form -->
 <?php include('includes/registration.php');?>
-
 <!--/Register-Form --> 
 
 <!--Forgot-password-Form -->
