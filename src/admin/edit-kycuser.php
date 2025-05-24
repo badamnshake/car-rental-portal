@@ -1,6 +1,8 @@
 <?php
 session_start();
 error_reporting(0);
+// error_reporting(E_ALL);
+// ini_set('display_errors', 1);
 include('includes/config.php');
 if (strlen($_SESSION['alogin']) == 0) {
 	header('location:index.php');
@@ -66,19 +68,43 @@ if (strlen($_SESSION['alogin']) == 0) {
 	}
 
 	//Open Document
-	$imageData = '';
+	require_once '../includes/encryption.php';
+	$decryptedImage = '';
+
 	if (isset($_GET['id'])) {
 		$user_id = $_GET['id'];
-		$sql = "SELECT photo_base64 FROM tbluserphotos WHERE user_id = :user_id";
-		$query = $dbh->prepare($sql);
-		$query->bindParam(':user_id', $user_id, PDO::PARAM_INT);
-		$query->execute();
-		$result = $query->fetch(PDO::FETCH_ASSOC);
-		if ($result) {
-			$imageData = $result['photo_base64'];
+
+		$sql = "SELECT photo_base64, aes_key, iv FROM tbluserphotos WHERE user_id = :user_id";
+		$stmt = $dbh->prepare($sql);
+		$stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+		$stmt->execute();
+		$result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+		if (isset($_POST['decrypt']) && isset($_FILES['private_key'])) {
+			if ($result && is_uploaded_file($_FILES['private_key']['tmp_name'])) {
+				$privateKey = file_get_contents($_FILES['private_key']['tmp_name']);
+
+				if ($privateKey) {
+					$aesKey = null;
+					if (openssl_private_decrypt(base64_decode($result['aes_key']), $aesKey, $privateKey)) {
+						$decryptedBinary = openssl_decrypt(
+							base64_decode($result['photo_base64']),
+							'AES-256-CBC',
+							$aesKey,
+							OPENSSL_RAW_DATA,
+							base64_decode($result['iv'])
+						);
+
+						if ($decryptedBinary) {
+							$decryptedImage = base64_encode($decryptedBinary);
+						}
+					}
+				}
+			}
 		}
 	}
-?>
+
+	?>
 	?>
 
 	<!doctype html>
@@ -149,10 +175,19 @@ if (strlen($_SESSION['alogin']) == 0) {
 									<div class="panel panel-default">
 										<!--div class="panel-heading">Update User Details</div-->
 										<div class="panel-body">
-											<form method="post" name="chngpwd" class="form-horizontal" onSubmit="return valid();">
+											<form method="post" name="chngpwd" class="form-horizontal"
+												onSubmit="return valid();">
 
 
-												<?php if ($error) { ?><div class="errorWrap"><strong>ERROR</strong>:<?php echo htmlentities($error); ?> </div><?php } else if ($msg) { ?><div class="succWrap"><strong>SUCCESS</strong>:<?php echo htmlentities($msg); ?> </div><?php } ?>
+												<?php if ($error) { ?>
+													<div class="errorWrap">
+														<strong>ERROR</strong>:<?php echo htmlentities($error); ?>
+													</div>
+												<?php } else if ($msg) { ?>
+														<div class="succWrap">
+															<strong>SUCCESS</strong>:<?php echo htmlentities($msg); ?>
+														</div>
+												<?php } ?>
 
 												<?php
 												$id = $_GET['id'];
@@ -164,11 +199,12 @@ if (strlen($_SESSION['alogin']) == 0) {
 												$cnt = 1;
 												if ($query->rowCount() > 0) {
 													foreach ($results as $result) {
-												?>
+														?>
 
 														<div class="form-group">
 															<div style="text-align: center;">
-																<img src="img/usericon.png" alt="User Icon" style="width: 130px; height: auto;">
+																<img src="img/usericon.png" alt="User Icon"
+																	style="width: 130px; height: auto;">
 															</div>
 															<div style="text-align: center;">
 																<div>
@@ -182,13 +218,17 @@ if (strlen($_SESSION['alogin']) == 0) {
 
 															<label class="col-sm-4 control-label">Full Name</label>
 															<div class="col-sm-8">
-																<input type="text" class="form-control" value="<?php echo htmlentities($result->FullName); ?>" name="fname" id="fname" required>
+																<input type="text" class="form-control"
+																	value="<?php echo htmlentities($result->FullName); ?>"
+																	name="fname" id="fname" required>
 															</div>
 
 
 															<label class="col-sm-4 control-label">Date of Birth</label>
 															<div class="col-sm-8">
-																<input type="text" class="form-control" value="<?php echo htmlentities($result->dob); ?>" name="dob" id="dob" required>
+																<input type="text" class="form-control"
+																	value="<?php echo htmlentities($result->dob); ?>" name="dob"
+																	id="dob" required>
 															</div>
 
 															<!--
@@ -205,13 +245,14 @@ if (strlen($_SESSION['alogin']) == 0) {
 														</div>
 														<div class="hr-dashed"></div>
 
-												<?php }
+													<?php }
 												} ?>
 
 												<!-- View Verification Button -->
 												<div class="form-group">
 													<div class="col-sm-8 col-sm-offset-4 mb-3">
-														<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#documentModal">
+														<button type="button" class="btn btn-primary" data-toggle="modal"
+															data-target="#documentModal">
 															View Verification Document
 														</button>
 													</div>
@@ -220,9 +261,12 @@ if (strlen($_SESSION['alogin']) == 0) {
 												<!-- Approve / Update / Decline Buttons -->
 												<div class="form-group">
 													<div class="col-sm-8 col-sm-offset-4">
-														<button class="btn btn-success" name="approve" type="submit">Approve</button>
-														<button class="btn btn-primary" name="update" type="submit">Update</button>
-														<button class="btn btn-danger" name="decline" type="submit">Decline</button>
+														<button class="btn btn-success" name="approve"
+															type="submit">Approve</button>
+														<button class="btn btn-primary" name="update"
+															type="submit">Update</button>
+														<button class="btn btn-danger" name="decline"
+															type="submit">Decline</button>
 													</div>
 												</div>
 
@@ -245,7 +289,8 @@ if (strlen($_SESSION['alogin']) == 0) {
 		</div>
 
 		<!-- Modal -->
-		<div class="modal fade" id="documentModal" tabindex="-1" role="dialog" aria-labelledby="documentModalLabel" aria-hidden="true">
+		<div class="modal fade" id="documentModal" tabindex="-1" role="dialog" aria-labelledby="documentModalLabel"
+			aria-hidden="true">
 			<div class="modal-dialog modal-lg" role="document">
 				<div class="modal-content">
 					<div class="modal-header">
@@ -255,12 +300,23 @@ if (strlen($_SESSION['alogin']) == 0) {
 						</button>
 					</div>
 					<div class="modal-body text-center">
-						<?php if (!empty($imageData)): ?>
-							<img src="data:image/jpeg;base64,<?php echo $imageData; ?>"
-								alt="Verification Document"
-								style="max-width: 100%; height: auto; border: 1px solid #ccc;">
-						<?php else: ?>
-							<p>No image found for this user.</p>
+
+						<form method="post" enctype="multipart/form-data">
+							<div class="form-group">
+								<label for="private_key">Upload RSA Private Key (.pem):</label>
+								<input type="file" name="private_key" id="private_key" class="form-control" accept=".pem"
+									required>
+							</div>
+							<button type="submit" name="decrypt" class="btn btn-primary">Decrypt Image</button>
+						</form>
+
+						<?php if (!empty($decryptedImage)): ?>
+							<div style="margin-top:20px;">
+								<img src="data:image/jpeg;base64,<?php echo $decryptedImage; ?>" alt="Decrypted Passport"
+									style="max-width:100%; height:auto; border:1px solid #ccc;">
+							</div>
+						<?php elseif (isset($_POST['decrypt'])): ?>
+							<p class="text-danger">❌ Decryption failed. Check private key and try again.</p>
 						<?php endif; ?>
 					</div>
 				</div>

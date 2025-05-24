@@ -10,7 +10,7 @@ define('GOOGLE_REDIRECT_URI', '');
 // Establish database connection.
 try
 {
-$dbh = new PDO('mysql:dbname=carrental;host=mariadb;charset=utf8mb4;port=3306', 
+$dbh = new PDO('', 
       DB_USER, 
       DB_PASS, 
   );

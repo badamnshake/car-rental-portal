@@ -109,7 +109,7 @@ foreach($results as $result)
    
       <div class="col-md-8 col-sm-8">
         <div class="profile_wrap">
-          <h5 class="uppercase underline">My Booikngs </h5>
+          <h5 class="uppercase underline">My Bookings </h5>
           <div class="my_vehicles_list">
             <ul class="vehicle_listing">
 <?php 

@@ -18,3 +18,10 @@ CREATE TABLE tbluserphotos (
         ON DELETE CASCADE
 );
 
+
+ALTER TABLE tbluserphotos
+ADD COLUMN aes_key TEXT,
+ADD COLUMN iv TEXT;
+
+
+
