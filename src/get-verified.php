@@ -45,142 +45,307 @@ function extractNames($fullName) {
 }
 
 function namesMatch($profileName, $passportSurname, $passportNames) {
-    // Normalize all inputs
-    $profileParts = extractNames($profileName);
-    $passportSurname = normalizeString($passportSurname);
-    $passportNames = normalizeString($passportNames);
-    
-    // Split passport names (given names)
-    $passportGivenNames = array_filter(explode(' ', $passportNames));
-    
-    // Combine all passport name parts
-    $allPassportParts = array_merge([$passportSurname], $passportGivenNames);
-    $allPassportParts = array_filter($allPassportParts);
-    
-    // Check if profile has at least 2 name parts (first + last)
-    if (count($profileParts) < 2) {
-        return [
-            'match' => false,
-            'reason' => 'Profile name must contain at least first and last name'
-        ];
-    }
-    
-    // Strategy 1: Check if surname matches last name in profile
-    $profileLastName = end($profileParts);
-    if ($passportSurname !== $profileLastName) {
-        return [
-            'match' => false,
-            'reason' => "Surname mismatch: Profile '{$profileLastName}' vs Passport '{$passportSurname}'"
-        ];
-    }
-    
-    // Strategy 2: Check if at least one given name matches
-    $profileFirstNames = array_slice($profileParts, 0, -1); // All except last
-    $matchedGivenNames = 0;
-    
-    foreach ($profileFirstNames as $profileFirstName) {
-        foreach ($passportGivenNames as $passportGivenName) {
-            // Check exact match or if one contains the other (for nicknames)
-            if ($profileFirstName === $passportGivenName || 
-                strpos($profileFirstName, $passportGivenName) !== false ||
-                strpos($passportGivenName, $profileFirstName) !== false) {
-                $matchedGivenNames++;
-                break;
-            }
-        }
-    }
-    
-    // Require at least one given name to match
-    if ($matchedGivenNames === 0) {
-        return [
-            'match' => false,
-            'reason' => 'No matching given names found between profile and passport'
-        ];
-    }
-    
-    // Calculate match confidence
-    $totalProfileNames = count($profileParts);
-    $totalPassportNames = count($allPassportParts);
-    $matchConfidence = (($matchedGivenNames + 1) / max($totalProfileNames, $totalPassportNames)) * 100;
-    
-    return [
-        'match' => true,
-        'confidence' => round($matchConfidence, 2),
-        'matched_names' => $matchedGivenNames + 1, // +1 for surname
-        'reason' => 'Names match successfully'
-    ];
+  // Normalize all inputs
+  $profileParts = extractNames($profileName);
+  $passportSurname = normalizeString($passportSurname);
+  $passportNames = normalizeString($passportNames);
+  
+  // Split passport names (given names)
+  $passportGivenNames = array_filter(explode(' ', $passportNames));
+  
+  // Combine all passport name parts
+  $allPassportParts = array_merge([$passportSurname], $passportGivenNames);
+  $allPassportParts = array_filter($allPassportParts);
+  
+  // Check if profile has at least 2 name parts (first + last)
+  if (count($profileParts) < 2) {
+      return [
+          'match' => false,
+          'reason' => 'Profile name must contain at least first and last name',
+          'manual_review' => false
+      ];
+  }
+  
+  // MODIFIED: Check given names first, then handle surname logic
+  $profileFirstNames = array_slice($profileParts, 0, -1); // All except last
+  $matchedGivenNames = 0;
+  
+  foreach ($profileFirstNames as $profileFirstName) {
+      foreach ($passportGivenNames as $passportGivenName) {
+          // Check exact match or if one contains the other (for nicknames)
+          if ($profileFirstName === $passportGivenName || 
+              strpos($profileFirstName, $passportGivenName) !== false ||
+              strpos($passportGivenName, $profileFirstName) !== false) {
+              $matchedGivenNames++;
+              break;
+          }
+      }
+  }
+  
+  // Check surname match
+  $profileLastName = end($profileParts);
+  $surnameMatches = ($passportSurname === $profileLastName);
+  
+  // MODIFIED: New logic based on given name and surname combinations
+  if ($surnameMatches && $matchedGivenNames > 0) {
+      // Perfect match: both surname and given names match
+      $totalProfileNames = count($profileParts);
+      $totalPassportNames = count($allPassportParts);
+      $matchConfidence = (($matchedGivenNames + 1) / max($totalProfileNames, $totalPassportNames)) * 100;
+      
+      return [
+          'match' => true,
+          'confidence' => round($matchConfidence, 2),
+          'matched_names' => $matchedGivenNames + 1,
+          'reason' => 'Names match successfully'
+      ];
+      
+  } elseif (!$surnameMatches && $matchedGivenNames > 0) {
+      // MODIFIED: Given names match but surname doesn't - send to manual review
+      return [
+          'match' => false,
+          'reason' => "Surname mismatch but given names match: Profile surname '{$profileLastName}' vs Passport surname '{$passportSurname}' (matched {$matchedGivenNames} given name(s))",
+          'manual_review' => true,
+          'matched_given_names' => $matchedGivenNames,
+          'surname_match' => false
+      ];
+      
+  } elseif ($surnameMatches && $matchedGivenNames === 0) {
+      // Surname matches but no given names match - immediate rejection
+      return [
+          'match' => false,
+          'reason' => 'No matching given names found between profile and passport (surname matches)',
+          'manual_review' => false
+      ];
+      
+  } else {
+      // MODIFIED: Neither surname nor given names match - immediate rejection
+      return [
+          'match' => false,
+          'reason' => "Complete name mismatch: Profile surname '{$profileLastName}' vs Passport surname '{$passportSurname}' and no matching given names",
+          'manual_review' => false
+      ];
+  }
 }
 
-function isPassportValid($result, $profileFullName) {
-    // Check if basic response is valid
-    if (!isset($result['success']) || $result['success'] !== true) {
-        return [
-            'valid' => false,
-            'reason' => 'API request failed'
-        ];
-    }
-    
-    // Check MRZ validity - most important check
-    if (!isset($result['valid_mrz']) || $result['valid_mrz'] !== true) {
-        return [
-            'valid' => false,
-            'reason' => 'Invalid MRZ format'
-        ];
-    }
-    
-    // Check score threshold
-    $validScore = $result['valid_score'] ?? 0;
-    if ($validScore < 70) {
-        return [
-            'valid' => false,
-            'reason' => "Validation score too low: {$validScore}%"
-        ];
-    }
-    
-    // Check individual field validations in parsed_data
-    $parsedData = $result['parsed_data'] ?? [];
-    $requiredFields = ['valid_number', 'valid_date_of_birth', 'valid_expiration_date'];
-    $validFieldCount = 0;
-    
-    foreach ($requiredFields as $field) {
-        if (isset($parsedData[$field]) && $parsedData[$field] === true) {
-            $validFieldCount++;
-        }
-    }
-    
-    if ($validFieldCount < 2) {
-        return [
-            'valid' => false,
-            'reason' => 'Insufficient valid passport fields'
-        ];
-    }
-    
-    // NEW: Check name matching
-    $passportSurname = $parsedData['surname'] ?? '';
-    $passportNames = $parsedData['names'] ?? '';
-    
-    if (empty($passportSurname) || empty($passportNames)) {
-        return [
-            'valid' => false,
-            'reason' => 'Missing name information in passport'
-        ];
-    }
-    
-    $nameCheck = namesMatch($profileFullName, $passportSurname, $passportNames);
-    
-    if (!$nameCheck['match']) {
-        return [
-            'valid' => false,
-            'reason' => 'Name verification failed: ' . $nameCheck['reason']
-        ];
-    }
-    
-    return [
-        'valid' => true,
-        'reason' => 'All validations passed',
-        'name_confidence' => $nameCheck['confidence'] ?? 0,
-        'validation_score' => $validScore
-    ];
+function validateDateOfBirth($profileDOB, $passportDOB) {
+  // Parse profile DOB (expected format: YYYY-MM-DD from database)
+  $profileDate = null;
+  
+  if (!empty($profileDOB) && $profileDOB !== '0000-00-00') {
+      $profileDate = DateTime::createFromFormat('Y-m-d', $profileDOB);
+  }
+  
+  if (!$profileDate) {
+      return [
+          'match' => false,
+          'reason' => 'Invalid or missing profile date of birth',
+          'manual_review' => true
+      ];
+  }
+  
+  // Parse passport DOB (MRZ format: YYMMDD)
+  if (empty($passportDOB) || strlen($passportDOB) !== 6) {
+      return [
+          'match' => false,
+          'reason' => 'Invalid passport date of birth format in MRZ',
+          'manual_review' => true
+      ];
+  }
+  
+  $passportYear = substr($passportDOB, 0, 2);
+  $passportMonth = substr($passportDOB, 2, 2);
+  $passportDay = substr($passportDOB, 4, 2);
+  
+  // Handle 2-digit year conversion (same logic as expiry date)
+  $currentTwoDigitYear = date('y');
+  if ($passportYear > $currentTwoDigitYear + 10) {
+      $passportYear = '19' . $passportYear;
+  } else {
+      $passportYear = '20' . $passportYear;
+  }
+  
+  $passportDate = DateTime::createFromFormat('Y-m-d', "$passportYear-$passportMonth-$passportDay");
+  
+  if (!$passportDate) {
+      return [
+          'match' => false,
+          'reason' => 'Invalid passport date format in MRZ',
+          'manual_review' => true
+      ];
+  }
+  
+  error_log("DOB CHECK: Profile DOB: " . $profileDate->format('d/m/Y') . ", Passport DOB: " . $passportDate->format('d/m/Y'));
+  
+  // MODIFIED: Only accept EXACT matches - no tolerance for differences
+  if ($profileDate->format('Y-m-d') === $passportDate->format('Y-m-d')) {
+      error_log("DOB CHECK: EXACT MATCH - Dates are identical");
+      return [
+          'match' => true,
+          'reason' => 'Date of birth matches exactly',
+          'profile_date' => $profileDate->format('Y-m-d'),
+          'passport_date' => $passportDate->format('Y-m-d')
+      ];
+  } else {
+      // MODIFIED: Any difference results in immediate rejection
+      $diff = $profileDate->diff($passportDate);
+      $daysDiff = $diff->days;
+      
+      error_log("DOB CHECK: MISMATCH - Difference: $daysDiff days (REJECTED - exact match required)");
+      return [
+          'match' => false,
+          'reason' => "Date of birth mismatch",
+          'manual_review' => false  // MODIFIED: All mismatches are immediate rejection
+      ];
+  }
+}
+
+function isPassportValid($result, $profileFullName, $profileDOB = null) {
+  // Check if basic response is valid
+  if (!isset($result['success']) || $result['success'] !== true) {
+      return [
+          'valid' => false,
+          'reason' => 'API request failed',
+          'manual_review' => false
+      ];
+  }
+  
+  // Check MRZ validity - most important check
+  if (!isset($result['valid_mrz']) || $result['valid_mrz'] !== true) {
+      return [
+          'valid' => false,
+          'reason' => 'Invalid MRZ format',
+          'manual_review' => true
+      ];
+  }
+  
+  // Check score threshold
+  $validScore = $result['valid_score'] ?? 0;
+  if ($validScore < 70) {
+      return [
+          'valid' => false,
+          'reason' => "Validation score too low: {$validScore}%",
+          'manual_review' => true
+      ];
+  }
+  
+  // Check individual field validations in parsed_data
+  $parsedData = $result['parsed_data'] ?? [];
+  $requiredFields = ['valid_number', 'valid_date_of_birth', 'valid_expiration_date'];
+  $validFieldCount = 0;
+  
+  foreach ($requiredFields as $field) {
+      if (isset($parsedData[$field]) && $parsedData[$field] === true) {
+          $validFieldCount++;
+      }
+  }
+  
+  if ($validFieldCount < 2) {
+      return [
+          'valid' => false,
+          'reason' => 'Insufficient valid passport fields',
+          'manual_review' => true
+      ];
+  }
+  
+  // Check passport expiry date with concise logging
+  $expirationDate = $parsedData['expiration_date'] ?? '';
+  $expiryDateFormatted = null;
+  
+  if (!empty($expirationDate)) {
+      // Parse expiration date (format: YYMMDD)
+      if (strlen($expirationDate) === 6) {
+          $year = substr($expirationDate, 0, 2);
+          $month = substr($expirationDate, 2, 2);
+          $day = substr($expirationDate, 4, 2);
+          
+          // Handle 2-digit year conversion
+          $currentTwoDigitYear = date('y'); // Current year as 2 digits
+          
+          if ($year > $currentTwoDigitYear + 10) {
+              $fullYear = '19' . $year;
+          } else {
+              $fullYear = '20' . $year;
+          }
+          
+          $dateString = "$fullYear-$month-$day";
+          $expiryDateTime = DateTime::createFromFormat('Y-m-d', $dateString);
+          $currentDate = new DateTime();
+          
+          if ($expiryDateTime) {
+              $isExpired = $expiryDateTime < $currentDate;
+              
+              if ($isExpired) {
+                  $expiredSince = $currentDate->diff($expiryDateTime)->days;
+                  error_log("EXPIRY CHECK: EXPIRED - Passport expired on " . $expiryDateTime->format('d/m/Y') . " ($expiredSince days ago)");
+                  
+                  return [
+                      'valid' => false,
+                      'reason' => 'Passport expired on ' . $expiryDateTime->format('d/m/Y') . " ($expiredSince days ago)",
+                      'manual_review' => false
+                  ];
+              } else {
+                  $expiresIn = $currentDate->diff($expiryDateTime)->days;
+                  error_log("EXPIRY CHECK: VALID - Passport expires on " . $expiryDateTime->format('d/m/Y') . " (in $expiresIn days)");
+              }
+              
+              $expiryDateFormatted = $expiryDateTime->format('Y-m-d');
+          } else {
+              error_log("EXPIRY CHECK: ERROR - Invalid date format: '$expirationDate'");
+          }
+      } else {
+          error_log("EXPIRY CHECK: ERROR - Invalid expiry length: '$expirationDate'");
+      }
+  } else {
+      error_log("EXPIRY CHECK: SKIPPED - No expiration date found");
+  }
+  
+  // NEW: Date of Birth Validation
+  $passportDOB = $parsedData['date_of_birth'] ?? '';
+  if (!empty($passportDOB) && !empty($profileDOB)) {
+      $dobCheck = validateDateOfBirth($profileDOB, $passportDOB);
+      
+      if (!$dobCheck['match']) {
+          return [
+              'valid' => false,
+              'reason' => 'Date of birth verification failed: ' . $dobCheck['reason'],
+              'manual_review' => $dobCheck['manual_review'] ?? false
+          ];
+      }
+  } else {
+      error_log("DOB CHECK: SKIPPED - Missing profile DOB: '" . ($profileDOB ?? 'null') . "' or passport DOB: '" . $passportDOB . "'");
+  }
+  
+  // Check name matching
+  $passportSurname = $parsedData['surname'] ?? '';
+  $passportNames = $parsedData['names'] ?? '';
+  
+  if (empty($passportSurname) || empty($passportNames)) {
+      return [
+          'valid' => false,
+          'reason' => 'Missing name information in passport',
+          'manual_review' => true
+      ];
+  }
+  
+  $nameCheck = namesMatch($profileFullName, $passportSurname, $passportNames);
+  
+  if (!$nameCheck['match']) {
+      return [
+          'valid' => false,
+          'reason' => 'Name verification failed: ' . $nameCheck['reason'],
+          'manual_review' => $nameCheck['manual_review'] ?? false
+      ];
+  }
+  
+  error_log("FINAL RESULT: APPROVED - All validations passed");
+  return [
+      'valid' => true,
+      'reason' => 'All validations passed',
+      'name_confidence' => $nameCheck['confidence'] ?? 0,
+      'validation_score' => $validScore,
+      'expiry_date' => $expiryDateFormatted
+  ];
 }
 
 function callPassportScanner($imageData, $isBase64 = false)
@@ -200,7 +365,7 @@ function callPassportScanner($imageData, $isBase64 = false)
     'Content-Type: application/json',
     'Content-Length: ' . strlen($payload)
   ]);
-  curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Add timeout
+  curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 
   $response = curl_exec($ch);
   
@@ -237,22 +402,25 @@ function callPassportScanner($imageData, $isBase64 = false)
   }
 
   $userId = $userData[0]->id;
-  $profileFullName = $userData[0]->fullname; // Get user's full name
+  $profileFullName = $userData[0]->fullname;
+  $profileDOB = $userData[0]->dob; // Get user's DOB from profile
   
-  // Use enhanced validation with name matching
-  $validation = isPassportValid($result, $profileFullName);
+  // Use enhanced validation with name AND DOB matching
+  $validation = isPassportValid($result, $profileFullName, $profileDOB);
   $isActuallyValid = $validation['valid'];
 
   // Debug section (uncomment for testing)
   /*
   echo "<h3>DEBUG INFO:</h3>";
   echo "<pre>Profile Name: " . htmlspecialchars($profileFullName) . "</pre>";
+  echo "<pre>Profile DOB: " . htmlspecialchars($profileDOB ?? 'N/A') . "</pre>";
   echo "<pre>isActuallyValid: " . ($isActuallyValid ? 'TRUE' : 'FALSE') . "</pre>";
   echo "<pre>Validation Reason: " . htmlspecialchars($validation['reason']) . "</pre>";
   
   $parsedData = $result['parsed_data'] ?? [];
   echo "<pre>Passport Surname: " . htmlspecialchars($parsedData['surname'] ?? 'N/A') . "</pre>";
   echo "<pre>Passport Names: " . htmlspecialchars($parsedData['names'] ?? 'N/A') . "</pre>";
+  echo "<pre>Passport DOB: " . htmlspecialchars($parsedData['date_of_birth'] ?? 'N/A') . "</pre>";
   
   if (isset($validation['name_confidence'])) {
       echo "<pre>Name Match Confidence: " . $validation['name_confidence'] . "%</pre>";
@@ -262,45 +430,86 @@ function callPassportScanner($imageData, $isBase64 = false)
 
   if (!$isActuallyValid) {
     
-    // Convert to binary if needed
-    if ($isBase64) {
-      $imageData = base64_decode($imageData);
-    }
-
-    $aesKey = generateAESKey();
-    $iv = generateIV();
-    $encryptedImage = encryptImage($imageData, $aesKey, $iv);
-    $encryptedKey = encryptAESKeyWithRSA($aesKey);
-
-    $stmt = $conn->prepare(
-      "INSERT INTO tbluserphotos (user_id, photo_base64, aes_key, iv)
-        VALUES (:userId, :image, :key, :iv)
-        ON DUPLICATE KEY UPDATE photo_base64 = :image, aes_key = :key, iv = :iv"
-    );
+    // Determine if this should go to manual review or be immediately rejected
+    $reason = $validation['reason'];
+    $requiresManualReview = $validation['manual_review'] ?? false;
     
-    $stmt->bindValue(':userId', $userId);
-    $stmt->bindValue(':image', base64_encode($encryptedImage)); // For LONGTEXT
-    $stmt->bindValue(':key', $encryptedKey);
-    $stmt->bindValue(':iv', base64_encode($iv));
-    
-    try {
-      $stmt->execute();
-    } catch (PDOException $e) {
-      error_log("Database error: " . $e->getMessage());
-      echo "Database error occurred";
-      return;
+    // Override manual review decision for specific cases
+    if (strpos($reason, 'expired') !== false) {
+        $requiresManualReview = false;
+        error_log("VALIDATION RESULT: IMMEDIATE REJECTION - Expired passport");
+        
+    } elseif (strpos($reason, 'Date of birth mismatch') !== false && strpos($reason, 'close but not exact') === false) {
+        $requiresManualReview = false;
+        error_log("VALIDATION RESULT: IMMEDIATE REJECTION - DOB mismatch");
+        
+    } elseif (strpos($reason, 'Complete name mismatch') !== false) {
+        $requiresManualReview = false;
+        error_log("VALIDATION RESULT: IMMEDIATE REJECTION - Complete name mismatch");
+        
+    } else {
+        error_log("VALIDATION RESULT: " . ($requiresManualReview ? 'MANUAL REVIEW' : 'IMMEDIATE REJECTION') . " - " . $reason);
     }
+    
+    if ($requiresManualReview) {
+        // MANUAL REVIEW - Store image and set pending
+        
+        // Convert to binary if needed
+        if ($isBase64) {
+            $imageData = base64_decode($imageData);
+        }
 
-    $conn->query("UPDATE tblusers SET is_verified = 0, verification_pending = 1 WHERE id = '$userId'");
+        $aesKey = generateAESKey();
+        $iv = generateIV();
+        $encryptedImage = encryptImage($imageData, $aesKey, $iv);
+        $encryptedKey = encryptAESKeyWithRSA($aesKey);
 
-    // Enhanced error message with specific reason
-    echo "Passport validation failed: " . $validation['reason'];
-    $_SESSION['verification_pending'] = 1;
-    $_SESSION['is_verified'] = 0;
+        $stmt = $conn->prepare(
+            "INSERT INTO tbluserphotos (user_id, photo_base64, aes_key, iv)
+             VALUES (:userId, :image, :key, :iv)
+             ON DUPLICATE KEY UPDATE photo_base64 = :image, aes_key = :key, iv = :iv"
+        );
+        
+        $stmt->bindValue(':userId', $userId);
+        $stmt->bindValue(':image', base64_encode($encryptedImage));
+        $stmt->bindValue(':key', $encryptedKey);
+        $stmt->bindValue(':iv', base64_encode($iv));
+        
+        try {
+            $stmt->execute();
+        } catch (PDOException $e) {
+            error_log("Database error: " . $e->getMessage());
+            echo "Database error occurred";
+            return;
+        }
+
+        $conn->query("UPDATE tblusers SET is_verified = 0, verification_pending = 1 WHERE id = '$userId'");
+
+        echo "<div class='alert alert-warning'><strong>Manual Review Required:</strong> " . $validation['reason'] . 
+             "<br><small>Your passport has been submitted for manual verification by our team.</small></div>";
+        
+        $_SESSION['verification_pending'] = 1;
+        $_SESSION['is_verified'] = 0;
+        
+    } else {
+        // IMMEDIATE REJECTION - No image storage
+        $conn->query("UPDATE tblusers SET is_verified = 0, verification_pending = 0 WHERE id = '$userId'");
+        
+        echo "<div class='alert alert-danger'><strong>Verification Failed:</strong> " . $validation['reason'] . 
+             "<br><small>Please ensure your profile information matches your passport exactly and try again.</small></div>";
+        
+        $_SESSION['verification_pending'] = 0;
+        $_SESSION['is_verified'] = 0;
+    }
 
   } else {
-    // SUCCESS - passport passed all validation checks including name matching
-    $conn->query("UPDATE tblusers SET is_verified = 1, verification_pending = 0 WHERE EmailId = '$useremail'");
+    // SUCCESS - passport passed all validation checks
+    
+    // Update user with verification status only
+    $updateSql = "UPDATE tblusers SET is_verified = 1, verification_pending = 0 WHERE EmailId = :useremail";
+    $updateQuery = $conn->prepare($updateSql);
+    $updateQuery->bindParam(':useremail', $useremail, PDO::PARAM_STR);
+    $updateQuery->execute();
 
     $_SESSION['is_verified'] = 1;
     $_SESSION['verification_pending'] = 0;
@@ -308,10 +517,17 @@ function callPassportScanner($imageData, $isBase64 = false)
     $nameConfidence = $validation['name_confidence'] ?? 0;
     $validationScore = $validation['validation_score'] ?? 0;
     
-    echo "Passport verified successfully! Validation score: {$validationScore}%, Name match: {$nameConfidence}%";
-  }
+    echo "<div class='alert alert-success'><strong>Passport Verified Successfully!</strong></div>";
+}
 
-  header('Location: ' . $_SERVER['REQUEST_URI']);
+  // Show message without any redirects - let user see the result
+  echo "<script>
+    // Scroll to top to ensure message is visible
+    window.scrollTo(0, 0);
+  </script>";
+  
+  // Do NOT redirect - let the page display the status
+  return;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -341,11 +557,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if (!empty($error)) {
-  $safeError = htmlspecialchars($error, ENT_QUOTES);
-  echo "<script>
-    alert('$safeError');
-    window.location = window.location.pathname;
-  </script>";
+  echo "<div class='alert alert-danger'>" . htmlspecialchars($error, ENT_QUOTES) . "</div>";
+  echo "<script>window.scrollTo(0, 0);</script>";
 }
 
 ?>

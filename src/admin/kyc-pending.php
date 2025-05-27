@@ -7,18 +7,7 @@ if(strlen($_SESSION['alogin'])==0)
 header('location:index.php');
 }
 else{
-if(isset($_GET['del']))
-{
-$id=$_GET['del'];
-$sql = "delete from tblusers  WHERE id=:id";
-$query = $dbh->prepare($sql);
-$query -> bindParam(':id',$id, PDO::PARAM_STR);
-$query -> execute();
-$msg="Page data updated successfully";
-
-}
-
-
+// REMOVED: Delete user functionality - no longer needed for KYC management
 
  ?>
 
@@ -87,7 +76,6 @@ $msg="Page data updated successfully";
 
 						<!-- Zero Configuration Table -->
 						<div class="panel panel-default">
-							<div class="panel-heading">Listed  Brands</div>
 							<div class="panel-body">
 							<?php if($error){?><div class="errorWrap"><strong>ERROR</strong>:<?php echo htmlentities($error); ?> </div><?php } 
 				else if($msg){?><div class="succWrap"><strong>SUCCESS</strong>:<?php echo htmlentities($msg); ?> </div><?php }?>
@@ -129,8 +117,7 @@ foreach($results as $result)
 											<td><?php echo htmlentities($result->FullName);?></td>
 											<td><?php echo htmlentities($result->EmailId);?></td>
 											<td><?php echo htmlentities($result->RegDate);?></td>
-											<td><a href="edit-kycuser.php?id=<?php echo $result->id;?>"><i class="fa fa-edit"></i></a>&nbsp;&nbsp;
-<a href="kyc-pending.php?del=<?php echo $result->id;?>" onclick="return confirm('Do you want to delete');"><i class="fa fa-close"></i></a></td>
+											<td><a href="edit-kycuser.php?id=<?php echo $result->id;?>" class="btn btn-primary btn-sm"><i class="fa fa-edit"></i> Review</a></td>
 										</tr>
 										<?php $cnt=$cnt+1; }} ?>
 										
