@@ -336,9 +336,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $photoInfo = str_replace(' ', '+', $photoInfo);
     callPassportScanner($photoInfo, true);
   } else {
-    $error = "No image data provided.";
+    $error = "Image too large (more than 2 MB) Or corrupted Or No image data provided.";
   }
 }
+
+if (!empty($error)) {
+  $safeError = htmlspecialchars($error, ENT_QUOTES);
+  echo "<script>
+    alert('$safeError');
+    window.location = window.location.pathname;
+  </script>";
+}
+
 ?>
 
 <!DOCTYPE HTML>
@@ -532,7 +541,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <li><strong>MRZ Quality:</strong> Machine Readable Zone must be clear and valid</li>
                         <li><strong>Image Quality:</strong> Well-lit, in focus, and clearly visible text</li>
                         <li><strong>Document Validity:</strong> Passport must not be expired</li>
-                        <li><strong>Technical Score:</strong> Minimum 70% validation score required</li>
+                        <!-- <li><strong>Technical Score:</strong> Minimum 70% validation score required</li> -->
+                        <li><strong>Size:</strong> Maximum size of 2 MB allowed</li>
                       </ul>
                     </div>
 

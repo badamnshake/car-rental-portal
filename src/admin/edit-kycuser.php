@@ -59,6 +59,12 @@ if (strlen($_SESSION['alogin']) == 0) {
             verification_attempts = verification_attempts + 1
         WHERE id = :id";
 
+		// Delete related photo record
+		$deleteSql = "DELETE FROM tbluserphotos WHERE user_id = :id";
+		$deleteQuery = $dbh->prepare($deleteSql);
+		$deleteQuery->bindParam(':id', $id, PDO::PARAM_INT);
+		$deleteQuery->execute();
+
 		$query = $dbh->prepare($sql);
 		$query->bindParam(':id', $id, PDO::PARAM_INT);
 
