@@ -1,1 +1,5 @@
 /mariadb_data
+/src/.well-known
+**/__pycache__/
+*.pyc
+*.pyo
