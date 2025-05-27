@@ -3,7 +3,7 @@
 session_start();
 error_reporting(0);
 include('includes/config.php');
-if(strlen($_SESSION['login'])==0)
+if(strlen($_SESSION['login'])==0 || (isset($_SESSION['oauth']) && $_SESSION['oauth']) )
   { 
 header('location:index.php');
 }

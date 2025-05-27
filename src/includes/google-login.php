@@ -73,6 +73,7 @@ if (!isset($_SESSION['pending_oauth']) && isset($_GET['code'])) {
 
         $_SESSION['login'] = $email;
         $_SESSION['fname'] = $name;
+        $_SESSION['oauth'] = true;
 
         header("Location: ../index.php");
         exit();
@@ -98,6 +99,7 @@ if (!isset($_SESSION['pending_oauth']) && isset($_GET['code'])) {
 
         $_SESSION['login'] = $email;
         $_SESSION['fname'] = $name;
+        $_SESSION['oauth'] = true;
 
         header("Location: ../index.php");
         exit();
@@ -139,6 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $_SESSION['login'] = $userData['email'];
         $_SESSION['fname'] = $userData['name'];
+        $_SESSION['oauth'] = true;
         unset($_SESSION['pending_oauth']);
 
         header("Location: ../index.php");

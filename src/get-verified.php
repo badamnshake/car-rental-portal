@@ -633,9 +633,9 @@ if (!empty($error)) {
     document.getElementById('id_image').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (file) {
-        const maxSize = 10 * 1024 * 1024; // 10MB
+        const maxSize = 2 * 1024 * 1024; // 10MB
         if (file.size > maxSize) {
-          alert('File size must be less than 10MB');
+          alert('File size must be less than 2MB');
           e.target.value = '';
           return;
         }
