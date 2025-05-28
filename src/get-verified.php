@@ -348,13 +348,20 @@ function isPassportValid($result, $profileFullName, $profileDOB = null) {
   ];
 }
 
-function callPassportScanner($imageData)
+function callPassportScanner($imageData, $isBase64 = false)
 {
-
-  $imageData = str_replace(array("\r", "\n"), '', $imageData);
+  // Handle different input formats
+  if ($isBase64) {
+    // Already base64 - clean it up
+    $imageData = str_replace(array("\r", "\n"), '', $imageData);
+    $base64Image = $imageData;
+  } else {
+    // Raw binary data - convert to base64
+    $base64Image = base64_encode($imageData);
+  }
+  
   $url = 'http://passport-api:8000/scan';
-  $payload = json_encode(['image_base64' =>  $imageData] );
-
+  $payload = json_encode(['image_base64' => $base64Image]);
 
   $ch = curl_init($url);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -402,7 +409,7 @@ function callPassportScanner($imageData)
 
   $userId = $userData[0]->id;
   $profileFullName = $userData[0]->fullname;
-  $profileDOB = $userData[0]->dob; // Get user's DOB from profile
+  $profileDOB = $userData[0]->dob;
   
   // Use enhanced validation with name AND DOB matching
   $validation = isPassportValid($result, $profileFullName, $profileDOB);
@@ -438,7 +445,7 @@ function callPassportScanner($imageData)
         $requiresManualReview = false;
         error_log("VALIDATION RESULT: IMMEDIATE REJECTION - Expired passport");
         
-    } elseif (strpos($reason, 'Date of birth mismatch') !== false && strpos($reason, 'close but not exact') === false) {
+    } elseif (strpos($reason, 'Date of birth mismatch') !== false) {
         $requiresManualReview = false;
         error_log("VALIDATION RESULT: IMMEDIATE REJECTION - DOB mismatch");
         
@@ -453,12 +460,12 @@ function callPassportScanner($imageData)
     if ($requiresManualReview) {
         // MANUAL REVIEW - Store image and set pending
         
-        // Convert to binary if needed
-          $imageData = base64_decode($imageData);
+        // Convert base64 to binary for encryption
+        $binaryImageData = base64_decode($base64Image);
 
         $aesKey = generateAESKey();
         $iv = generateIV();
-        $encryptedImage = encryptImage($imageData, $aesKey, $iv);
+        $encryptedImage = encryptImage($binaryImageData, $aesKey, $iv);
         $encryptedKey = encryptAESKeyWithRSA($aesKey);
 
         $stmt = $conn->prepare(
@@ -515,7 +522,7 @@ function callPassportScanner($imageData)
     $validationScore = $validation['validation_score'] ?? 0;
     
     echo "<div class='alert alert-success'><strong>Passport Verified Successfully!</strong></div>";
-}
+  }
 
   // Show message without any redirects - let user see the result
   echo "<script>
@@ -523,31 +530,28 @@ function callPassportScanner($imageData)
     window.scrollTo(0, 0);
   </script>";
   
-  // Do NOT redirect - let the page display the status
   return;
 }
 
+//POST handling section
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!empty($_FILES['id_image']['tmp_name'])) {
-    // Case 1: File Upload
-    $fileTmpPath = $_FILES['id_image']['tmp_name'];
-    $fileName = basename($_FILES['id_image']['name']);
-    $targetPath = $uploadPath . $fileName;
+    // Case 1: File Upload - pass raw binary data
     $PhotoTypes = ['image/png', 'image/jpg', 'image/jpeg'];
 
     if (in_array($_FILES['id_image']['type'], $PhotoTypes)) {
       $imageData = file_get_contents($_FILES['id_image']['tmp_name']);
-      callPassportScanner(base64_encode($imageData));
+      callPassportScanner($imageData, false); // false = raw binary data
     } else {
       $error = "Error file type. Please upload JPG or PNG.";
     }
 
   } elseif (!empty($_POST['photoInfo'])) {
-    // Case 2: Webcam
+    // Case 2: Webcam - pass base64 data directly
     $photoInfo = $_POST['photoInfo'];
     $photoInfo = str_replace('data:image/png;base64,', '', $photoInfo);
     $photoInfo = str_replace(' ', '+', $photoInfo);
-    callPassportScanner($photoInfo);
+    callPassportScanner($photoInfo, true); // true = already base64
   } else {
     $error = "Image too large (more than 2 MB) Or corrupted Or No image data provided.";
   }
