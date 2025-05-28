@@ -784,7 +784,6 @@ if (!empty($error)) {
                         <br>
                         <button type="button" class="btn btn-info mt-2" onclick="startCamera()">Start Camera</button>
                         <button type="button" class="btn btn-warning mt-2" onclick="takeSnapshot()">Take Photo</button>
-                        <button type="button" class="btn btn-secondary mt-2" onclick="stopCamera()">Stop Camera</button>
                       </div>
 
                       <button type="submit" class="btn btn-success btn-block">Submit for Verification</button>
@@ -812,14 +811,6 @@ if (!empty($error)) {
         .catch(err => { alert("Unable to access webcam: " + err.message); });
     }
 
-    function stopCamera() {
-      if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
-        currentStream = null;
-        document.getElementById('video').srcObject = null;
-      }
-    }
-
     function takeSnapshot() {
       const video = document.getElementById('video');
       const canvas = document.getElementById('canvas');
@@ -837,10 +828,6 @@ if (!empty($error)) {
       
       // Visual feedback
       canvas.style.border = "2px solid green";
-      setTimeout(() => {
-        canvas.style.display = 'none';
-        canvas.style.border = "none";
-      }, 2000);
     }
 
     // File upload validation
