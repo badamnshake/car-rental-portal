@@ -16,17 +16,3 @@ UPDATE tblusers
 SET auth_type = 'legacy' 
 WHERE oauth_token IS NULL;
 
--- Create passport_verification table for PassportEye verified fields
-  CREATE TABLE passport_verification (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      user_id INT NOT NULL,
-      passport_number VARCHAR(20) NOT NULL,
-      full_name VARCHAR(255) NOT NULL,
-      date_of_birth DATE NOT NULL,
-      nationality VARCHAR(100) NOT NULL,
-      passport_expiry DATE NOT NULL,
-      verification_status ENUM('pending', 'verified', 'rejected') DEFAULT 'pending',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES tblusers(id) ON DELETE CASCADE
-  );
-

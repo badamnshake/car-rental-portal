@@ -183,14 +183,13 @@ function isPassportValid($result, $profileFullName) {
     ];
 }
 
-function callPassportScanner($imageData, $isBase64 = false)
+function callPassportScanner($imageData)
 {
-  if ($isBase64) {
-    $imageData = str_replace(array("\r", "\n"), '', $imageData);
-  }
-  
+
+  $imageData = str_replace(array("\r", "\n"), '', $imageData);
   $url = 'http://passport-api:8000/scan';
-  $payload = json_encode(['image_base64' => $isBase64 ? $imageData : base64_encode($imageData)]);
+  $payload = json_encode(['image_base64' =>  $imageData] );
+
 
   $ch = curl_init($url);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -263,9 +262,7 @@ function callPassportScanner($imageData, $isBase64 = false)
   if (!$isActuallyValid) {
     
     // Convert to binary if needed
-    if ($isBase64) {
-      $imageData = base64_decode($imageData);
-    }
+    $imageData = base64_decode($imageData);
 
     $aesKey = generateAESKey();
     $iv = generateIV();
@@ -324,7 +321,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (in_array($_FILES['id_image']['type'], $PhotoTypes)) {
       $imageData = file_get_contents($_FILES['id_image']['tmp_name']);
-      callPassportScanner($imageData, false);
+      callPassportScanner(base64_encode($imageData));
     } else {
       $error = "Error file type. Please upload JPG or PNG.";
     }
@@ -334,7 +331,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $photoInfo = $_POST['photoInfo'];
     $photoInfo = str_replace('data:image/png;base64,', '', $photoInfo);
     $photoInfo = str_replace(' ', '+', $photoInfo);
-    callPassportScanner($photoInfo, true);
+    callPassportScanner($photoInfo);
   } else {
     $error = "Image too large (more than 2 MB) Or corrupted Or No image data provided.";
   }
