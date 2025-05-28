@@ -6,7 +6,7 @@ define('DB_PASS','');
 define('DB_NAME','');
 define('GOOGLE_CLIENT_ID', '');
 define('GOOGLE_CLIENT_SECRET', '');
-define('GOOGLE_REDIRECT_URI', '');
+define('GOOGLE_REDIRECT_URI', 'http://localhost:8080/includes/google-login.php');
 // Establish database connection.
 try
 {
